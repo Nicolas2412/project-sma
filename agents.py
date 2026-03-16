@@ -15,18 +15,17 @@ import random
 
 class Robot(Agent):
     """ Robot Parent class """
-    def __init__(self, model, pos):
+    def __init__(self, model):
         super().__init__(model)
-        self.pos = pos
         
         # Real inventory (Will be modified by model.do() when actions succeed)
         self.wastes = {"green": 0, "yellow": 0, "red": 0}
         
+        # Strictly structured knowledge base
         self.knowledge = {
+            "current_pos": None,
             "inventory": self.wastes.copy(),
-            "percepts": {},       # Will store the dictionary of adjacent cells
-            "current_zone": 1,    # Default to zone 1
-            "current_pos": pos    # Keep track of where we are
+            "adjacent_squares": {}
         }
         
         self.current_percepts = {}
@@ -34,7 +33,7 @@ class Robot(Agent):
     def step(self):
         # If it's the very first step, we need initial percepts from the model
         if not self.current_percepts:
-            self.current_percepts = self.model.get_initial_percepts(self.pos)
+            self.current_percepts = self.model.get_initial_percepts(self)
 
         # Update knowledge based on new percepts and current real inventory
         self.knowledge = self.update(self.knowledge, self.current_percepts)
@@ -43,23 +42,48 @@ class Robot(Agent):
         action = self.deliberate(self.knowledge)
         
         # Do action in environment, environment returns new percepts
+        # percepts format: {"current_pos": (x, y), "adjacency_grid": {(x, y): [agents]}}
         self.current_percepts = self.model.do(self, action)
             
     def update(self, knowledge, percepts):
-        """Updates the agent's knowledge base using the percepts dictionary."""
-        knowledge["percepts"] = percepts
+        """
+        Updates the agent's knowledge base using the percepts dictionary.
+        Parses raw agents into pure data for the reasoning engine.
+        Handles int-to-string mapping for Waste colors (1: green, 2: yellow, 3: red).
+        """
+        # 1. Update Position directly from percepts
+        knowledge["current_pos"] = percepts["current_pos"]
         
-        # Update current pos WITHOUT calling self.pos inside deliberate
-        knowledge["current_pos"] = self.pos 
-        
-        # Sync the knowledge inventory with the real physical inventory 
+        # 2. Sync the knowledge inventory with the real physical inventory 
         knowledge["inventory"] = self.wastes.copy()
         
-        # Determine current zone based on the Radioactivity agent in our current position
-        if self.pos in percepts:
-            for obj in percepts[self.pos]:
+        # Map integer colors to our string-based data structure
+        color_mapping = {1: "green", 2: "yellow", 3: "red"}
+        
+        # 3. Parse adjacency_grid into clean data for adjacent_squares
+        parsed_squares = {}
+        for pos, agents_list in percepts["adjacency_grid"].items():
+            
+            # Default information for a square
+            sq_info = {
+                "radioactivity_level": None,
+                "zone": 1, # Defaults to 1 if no radioactivity agent is found
+                "wastes": {"green": 0, "yellow": 0, "red": 0}
+            }
+            
+            for obj in agents_list:
                 if isinstance(obj, Radioactivity):
-                    knowledge["current_zone"] = obj.zone
+                    sq_info["zone"] = obj.zone
+                    sq_info["radioactivity_level"] = getattr(obj, 'level', None) 
+                
+                elif isinstance(obj, Waste):
+                    # Translate integer to string key using the map
+                    color_name = color_mapping.get(obj.color)
+                    sq_info["wastes"][color_name] += 1
+                        
+            parsed_squares[pos] = sq_info
+            
+        knowledge["adjacent_squares"] = parsed_squares
                     
         return knowledge
                 
@@ -70,17 +94,17 @@ class Robot(Agent):
 
 class GreenAgent(Robot):
     """Green robot class: Handles Green Waste -> Yellow Waste"""
-    def __init__(self, model, pos=(0,0)):
-        super().__init__(model, pos)
-        self.type = "green"
+    def __init__(self, unique_id, model):
+        super().__init__(unique_id, model)
+        self.type = 1
     
     def deliberate(self, knowledge):
         # "stay" acts as a fallback so random.choice() never crashes.
         possible_actions = [{"type": "stay"}] 
         
-        inventory = knowledge["inventory"]
-        percepts = knowledge["percepts"]
         current_pos = knowledge["current_pos"]
+        inventory = knowledge["inventory"]
+        adj_squares = knowledge["adjacent_squares"]
         
         # --- 1. TRANSFORMATION & PUT AWAY ---
         if inventory["green"] >= 2:
@@ -90,28 +114,27 @@ class GreenAgent(Robot):
             possible_actions.append({"type": "put"})
 
         # --- 2. PICK UP WASTE ---
+        # Look at the parsed data for our current coordinate
         if inventory["green"] < 2 and inventory["yellow"] == 0:
-            if current_pos in percepts:
-                for obj in percepts[current_pos]:
-                    if isinstance(obj, Waste) and obj.color == "green":
-                        possible_actions.append({"type": "pick", "target": obj})
+            if current_pos in adj_squares:
+                if adj_squares[current_pos]["wastes"]["green"] > 0:
+                    # We no longer pass the raw object. We pass the INTENT to pick a color.
+                    possible_actions.append({"type": "pick"})
 
         # --- 3. MOVEMENT ---
-        for pos, contents in percepts.items():
+        for pos, sq_info in adj_squares.items():
             if pos == current_pos:
                 continue
                 
             valid_move = True
             
-            # DIRECTION RESTRICTION: Do not move West (pos[0] < current_pos[0]) if holding yellow waste
+            # DIRECTION RESTRICTION: Do not move West if holding yellow waste
             if inventory["yellow"] > 0 and pos[0] < current_pos[0]:
                 valid_move = False
 
             # ZONE RESTRICTION
-            for obj in contents:
-                if isinstance(obj, Radioactivity):
-                    if obj.zone > 1:
-                        valid_move = False
+            if sq_info["zone"] > 1:
+                valid_move = False
             
             if valid_move:
                 possible_actions.append({"type": "move", "target": pos})
@@ -121,16 +144,16 @@ class GreenAgent(Robot):
 
 class YellowAgent(Robot):
     """Yellow robot class: Handles Yellow Waste -> Red Waste"""
-    def __init__(self, model, pos):
-        super().__init__( model, pos)
-        self.type = "yellow"
+    def __init__(self, model):
+        super().__init__(model)
+        self.type = 2
     
     def deliberate(self, knowledge):
         possible_actions = [{"type": "stay"}]
         
-        inventory = knowledge["inventory"]
-        percepts = knowledge["percepts"]
         current_pos = knowledge["current_pos"]
+        inventory = knowledge["inventory"]
+        adj_squares = knowledge["adjacent_squares"]
         
         # --- 1. TRANSFORMATION & PUT AWAY ---
         if inventory["yellow"] >= 2:
@@ -141,13 +164,12 @@ class YellowAgent(Robot):
 
         # --- 2. PICK UP WASTE ---
         if inventory["yellow"] < 2 and inventory["red"] == 0:
-            if current_pos in percepts:
-                for obj in percepts[current_pos]:
-                    if isinstance(obj, Waste) and obj.color == "yellow":
-                        possible_actions.append({"type": "pick", "target": obj})
+            if current_pos in adj_squares:
+                if adj_squares[current_pos]["wastes"]["yellow"] > 0:
+                    possible_actions.append({"type": "pick"})
 
         # --- 3. MOVEMENT ---
-        for pos, contents in percepts.items():
+        for pos, sq_info in adj_squares.items():
             if pos == current_pos:
                 continue
                 
@@ -158,10 +180,8 @@ class YellowAgent(Robot):
                 valid_move = False
 
             # ZONE RESTRICTION
-            for obj in contents:
-                if isinstance(obj, Radioactivity):
-                    if obj.zone > 2:
-                        valid_move = False
+            if sq_info["zone"] > 2:
+                valid_move = False
             
             if valid_move:
                 possible_actions.append({"type": "move", "target": pos})
@@ -171,16 +191,16 @@ class YellowAgent(Robot):
 
 class RedAgent(Robot):
     """Red robot class: Handles Red Waste -> Disposal Zone"""
-    def __init__(self, model, pos):
-        super().__init__(model, pos)
-        self.type = "red"
-    
+    def __init__(self, model):
+        super().__init__(model)
+        self.type = 3
+        
     def deliberate(self, knowledge):
         possible_actions = [{"type": "stay"}]
         
-        inventory = knowledge["inventory"]
-        percepts = knowledge["percepts"]
         current_pos = knowledge["current_pos"]
+        inventory = knowledge["inventory"]
+        adj_squares = knowledge["adjacent_squares"]
         
         # --- 1. PUT AWAY ---
         if inventory["red"] > 0:
@@ -188,13 +208,12 @@ class RedAgent(Robot):
 
         # --- 2. PICK UP WASTE ---
         if inventory["red"] < 1:
-            if current_pos in percepts:
-                for obj in percepts[current_pos]:
-                    if isinstance(obj, Waste) and obj.color == "red":
-                        possible_actions.append({"type": "pick", "target": obj})
+            if current_pos in adj_squares:
+                if adj_squares[current_pos]["wastes"]["red"] > 0:
+                    possible_actions.append({"type": "pick"})
 
         # --- 3. MOVEMENT ---
-        for pos, contents in percepts.items():
+        for pos, sq_info in adj_squares.items():
             if pos == current_pos:
                 continue
                 
