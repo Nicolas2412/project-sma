@@ -94,8 +94,8 @@ class Robot(Agent):
 
 class GreenAgent(Robot):
     """Green robot class: Handles Green Waste -> Yellow Waste"""
-    def __init__(self, unique_id, model):
-        super().__init__(unique_id, model)
+    def __init__(self, model):
+        super().__init__(model)
         self.type = 1
     
     def deliberate(self, knowledge):
