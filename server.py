@@ -25,9 +25,21 @@ model_params = {
     "n_red_wastes" : 2,
     "height" : 10,
     "width_z1" : 10,
-    "width_z2" : 10,
-    "width_z3" : 10,
+    "width_z2" : 5,
+    "width_z3" : 3,
     }
+
+
+style = """
+    .mesa-viz-component {
+        width: 100% !important;
+        max-width: none !important;
+    }
+    .v-card {
+        width: 100% !important;
+    }
+"""
+
 
 def configure_axes(ax):
     ax.set_aspect('equal', adjustable='box') # Force le ratio 1:1
@@ -41,20 +53,20 @@ def agent_portrayal(agent):
     if isinstance(agent, Radioactivity):
         # On définit la couleur selon la zone
         portrayal["marker"] = "s"
-        portrayal["size"] = 500
+        portrayal["size"] = 50
         portrayal["zorder"] = 0
 
-        if agent.zone == 1:
+        if agent.type == 1:
             portrayal["color"] = "#73ff78"  # Vert clair
-        elif agent.zone == 2:
+        elif agent.type == 2:
             portrayal["color"] = "#ffe482"  # Jaune clair
-        elif agent.zone == 3:
+        elif agent.type == 3:
             portrayal["color"] = "#f59188"  # Rouge clair
             
     elif isinstance(agent, Waste):
         # On définit la couleur selon la zone
         portrayal["marker"] = "o"
-        portrayal["size"] = 10
+        portrayal["size"] = 50
         portrayal["zorder"] = 1
         
         if agent.color == 1:
@@ -67,24 +79,43 @@ def agent_portrayal(agent):
     elif isinstance(agent, GreenAgent):
         # On définit la couleur selon la zone
         portrayal["marker"] = "o"
-        portrayal["size"] = 10
+        portrayal["size"] = 50
         portrayal["zorder"] = 1
         portrayal["color"] = "#154e0e"
+        
+    elif isinstance(agent, YellowAgent):
+        # On définit la couleur selon la zone
+        portrayal["marker"] = "o"
+        portrayal["size"] = 50
+        portrayal["zorder"] = 1
+        portrayal["color"] = "#884400"
+        
+    elif isinstance(agent, RedAgent):
+        # On définit la couleur selon la zone
+        portrayal["marker"] = "o"
+        portrayal["size"] = 50
+        portrayal["zorder"] = 1
+        portrayal["color"] = "#3c0000"
         
     return portrayal
 
 model = RobotModel(**model_params, seed=0)
 
-SpaceGraph = make_space_component(agent_portrayal, post_process=configure_axes)
+SpaceGraph = make_space_component(agent_portrayal, 
+                                post_process=configure_axes)
 
 
 # Create the Dashboard
-page = SolaraViz(
-    model,
-    components=[SpaceGraph],
-    model_params=model_params,
-    name="Waste Collection",
-)
+@solara.component
+def StyledDashboard():
+    solara.Style(style)
+    SolaraViz(
+        model,
+        components=[SpaceGraph],
+        model_params=model_params,
+    )
+
+
 # This is required to render the visualization in the Jupyter notebook
-page
+page = StyledDashboard()
 # to start : "solara run server.py"

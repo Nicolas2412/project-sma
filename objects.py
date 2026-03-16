@@ -21,7 +21,7 @@ class Radioactivity(Agent):
         """
         super().__init__(model)
 
-        self.zone = zone
+        self.type = zone
         self.radioactivity = ((zone - 1) / 3) + rd.uniform(0, 1/3)
 
 

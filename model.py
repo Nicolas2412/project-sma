@@ -31,7 +31,7 @@ class RobotModel(mesa.Model):
         Args:
             seed (_type_, optional): Seed for the randoms. Defaults to None.
         """
-        super().__init__(seed=seed)
+        super().__init__(rng=seed)
         
         self.n_green = n_green_agents
         self.n_yellow = n_yellow_agents
@@ -54,16 +54,15 @@ class RobotModel(mesa.Model):
                 agent = Radioactivity(self, zone=1)
                 self.grid.place_agent(agent, (i, j))
                 
-        for i in range(self.width_z1):
+        for i in range(self.width_z1, self.width_z1 + self.width_z2):
             for j in range(self.height):
                 agent = Radioactivity(self, zone=2)
-                self.grid.place_agent(agent, (self.width_z1 + i, j))
+                self.grid.place_agent(agent, (i, j))
                 
-        for i in range(self.width_z1):
+        for i in range(self.width_z1 + self.width_z2, self.total_width):
             for j in range(self.height):
                 agent = Radioactivity(self, zone=3)
-                self.grid.place_agent(
-                    agent, (self.width_z1 + self.width_z2 + i, j))
+                self.grid.place_agent(agent, (i, j))
         
         green_wastes = Waste.create_agents(model=self, n=n_green_wastes, color=1)
         # Create x and y positions for agents
@@ -100,12 +99,68 @@ class RobotModel(mesa.Model):
             # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
+        # yellow_agents = YellowAgent.create_agents(
+        #     model=self, n=n_yellow_agents)
+        # # Create x and y positions for agents
+        # x = self.rng.integers(self.width_z1, self.width_z1 + self.width_z2, size=(n_yellow_agents,))
+        # y = self.rng.integers(0, self.grid.height, size=(n_yellow_agents,))
+        # for a, i, j in zip(yellow_agents, x, y):
+        #     # Add the agent to a random grid cell
+        #     self.grid.place_agent(a, (i, j))
             
-    # def do(self, agent:mesa.Agent, action:str):
+        # red_agents = RedAgent.create_agents(
+        #     model=self, n=n_red_agents)
+        # # Create x and y positions for agents
+        # x = self.rng.integers(self.width_z1 + self.width_z2, self.width_z1 +
+        #                     self.width_z2 + self.width_z3, size=(n_red_agents,))
+        # y = self.rng.integers(0, self.grid.height, size=(n_red_agents,))
+        # for a, i, j in zip(red_agents, x, y):
+        #     # Add the agent to a random grid cell
+        #     self.grid.place_agent(a, (i, j))
+            
+            
+    def do(self, agent:Robot, action:str):
         
-        # if action == "move_up":
-        #     new_pos = (agent.pos[0], agent.pos[1] - 1)
-        #     if self.grid.is_cell_empty(new_pos):
-        #         self.model.grid.move_agent(agent, new_pos)
-        #     else:
-        #         pass
+        action_type = action["type"]
+        
+        if action_type == "move": 
+            new_pos = action["target"]
+            if not self.grid.out_of_bounds(new_pos):
+            
+                agents_on_new_pos = self.grid.get_cell_list_contents([new_pos])
+                perform = True
+                for agent_on_new_pos in agents_on_new_pos:
+                    if not isinstance(agent_on_new_pos, Radioactivity):
+                        pass
+                    else:
+                        if agent.type < agent_on_new_pos.type:
+                            # Invalid action
+                            perform = False
+                if perform:
+                    agent.pos = new_pos
+        
+        elif action_type == "pick":
+            pass
+            
+        elif action_type == "put":
+            pass
+        
+        elif action_type == "transform":
+            pass
+        
+        else:
+            raise ValueError(f"Unknown action type: {action_type}")
+                
+        percepts = self.get_percepts(agent)
+        return percepts
+    
+
+    def get_percepts(self, agent:Robot):
+        
+        percepts = {'pos': agent.pos}
+        
+        return percepts
+        
+    def step(self):
+        """do one step of the model"""
+        self.agents.shuffle_do("step")

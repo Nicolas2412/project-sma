@@ -15,9 +15,8 @@ import random
 
 class Robot(Agent):
     """ Robot Parent class """
-    def __init__(self, model, pos):
+    def __init__(self, model):
         super().__init__(model)
-        self.pos = pos
         
         # Real inventory (Will be modified by model.do() when actions succeed)
         self.wastes = {"green": 0, "yellow": 0, "red": 0}
@@ -26,15 +25,16 @@ class Robot(Agent):
             "inventory": self.wastes.copy(),
             "percepts": {},       # Will store the dictionary of adjacent cells
             "current_zone": 1,    # Default to zone 1
-            "current_pos": pos    # Keep track of where we are
+            "current_pos": None    # Keep track of where we are
         }
         
-        self.current_percepts = {}
+        self.current_percepts = None
 
     def step(self):
         # If it's the very first step, we need initial percepts from the model
-        if not self.current_percepts:
-            self.current_percepts = self.model.get_initial_percepts(self.pos)
+        if self.current_percepts is None:
+            self.current_percepts = self.model.get_percepts(self)
+        print(self.current_percepts)
 
         # Update knowledge based on new percepts and current real inventory
         self.knowledge = self.update(self.knowledge, self.current_percepts)
@@ -50,7 +50,7 @@ class Robot(Agent):
         knowledge["percepts"] = percepts
         
         # Update current pos WITHOUT calling self.pos inside deliberate
-        knowledge["current_pos"] = self.pos 
+        knowledge["current_pos"] = percepts['pos']
         
         # Sync the knowledge inventory with the real physical inventory 
         knowledge["inventory"] = self.wastes.copy()
@@ -70,60 +70,68 @@ class Robot(Agent):
 
 class GreenAgent(Robot):
     """Green robot class: Handles Green Waste -> Yellow Waste"""
-    def __init__(self, model, pos=(0,0)):
-        super().__init__(model, pos)
-        self.type = "green"
+    def __init__(self, model):
+        super().__init__(model)
+        self.type = 1
     
     def deliberate(self, knowledge):
         # "stay" acts as a fallback so random.choice() never crashes.
-        possible_actions = [{"type": "stay"}] 
+        # possible_actions = [{"type": "stay"}] 
+        x, y = knowledge["current_pos"]
         
-        inventory = knowledge["inventory"]
-        percepts = knowledge["percepts"]
-        current_pos = knowledge["current_pos"]
+        possible_actions = [{"type": "move", "target": (x, y +1)},
+                            {"type": "move", "target": (x , y -1)},
+                            {"type": "move", "target": (x + 1, y)},
+                            {"type": "move", "target": (x + -1, y)}
+                            ] 
         
-        # --- 1. TRANSFORMATION & PUT AWAY ---
-        if inventory["green"] >= 2:
-            possible_actions.append({"type": "transform"})
+        # inventory = knowledge["inventory"]
+        # percepts = knowledge["percepts"]
+        # current_pos = knowledge["current_pos"]
+        
+        # # --- 1. TRANSFORMATION & PUT AWAY ---
+        # if inventory["green"] >= 2:
+        #     possible_actions.append({"type": "transform"})
             
-        if inventory["yellow"] > 0:
-            possible_actions.append({"type": "put"})
+        # if inventory["yellow"] > 0:
+        #     possible_actions.append({"type": "put"})
 
-        # --- 2. PICK UP WASTE ---
-        if inventory["green"] < 2 and inventory["yellow"] == 0:
-            if current_pos in percepts:
-                for obj in percepts[current_pos]:
-                    if isinstance(obj, Waste) and obj.color == "green":
-                        possible_actions.append({"type": "pick", "target": obj})
+        # # --- 2. PICK UP WASTE ---
+        # if inventory["green"] < 2 and inventory["yellow"] == 0:
+        #     if current_pos in percepts:
+        #         for obj in percepts[current_pos]:
+        #             if isinstance(obj, Waste) and obj.color == "green":
+        #                 possible_actions.append({"type": "pick", "target": obj})
 
-        # --- 3. MOVEMENT ---
-        for pos, contents in percepts.items():
-            if pos == current_pos:
-                continue
+        # # --- 3. MOVEMENT ---
+        # for pos, contents in percepts.items():
+        #     if pos == current_pos:
+        #         continue
                 
-            valid_move = True
+        #     valid_move = True
             
-            # DIRECTION RESTRICTION: Do not move West (pos[0] < current_pos[0]) if holding yellow waste
-            if inventory["yellow"] > 0 and pos[0] < current_pos[0]:
-                valid_move = False
+        #     # DIRECTION RESTRICTION: Do not move West (pos[0] < current_pos[0]) if holding yellow waste
+        #     if inventory["yellow"] > 0 and pos[0] < current_pos[0]:
+        #         valid_move = False
 
-            # ZONE RESTRICTION
-            for obj in contents:
-                if isinstance(obj, Radioactivity):
-                    if obj.zone > 1:
-                        valid_move = False
+        #     # ZONE RESTRICTION
+        #     for obj in contents:
+        #         if isinstance(obj, Radioactivity):
+        #             if obj.zone > 1:
+        #                 valid_move = False
             
-            if valid_move:
-                possible_actions.append({"type": "move", "target": pos})
+        #     if valid_move:
+        #         possible_actions.append({"type": "move", "target": pos})
 
         return random.choice(possible_actions)
 
 
 class YellowAgent(Robot):
     """Yellow robot class: Handles Yellow Waste -> Red Waste"""
-    def __init__(self, model, pos):
-        super().__init__( model, pos)
-        self.type = "yellow"
+
+    def __init__(self, model):
+        super().__init__( model)
+        self.type = 2
     
     def deliberate(self, knowledge):
         possible_actions = [{"type": "stay"}]
@@ -171,9 +179,10 @@ class YellowAgent(Robot):
 
 class RedAgent(Robot):
     """Red robot class: Handles Red Waste -> Disposal Zone"""
-    def __init__(self, model, pos):
-        super().__init__(model, pos)
-        self.type = "red"
+
+    def __init__(self, model):
+        super().__init__(model)
+        self.type = 3
     
     def deliberate(self, knowledge):
         possible_actions = [{"type": "stay"}]
