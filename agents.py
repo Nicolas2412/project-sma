@@ -33,7 +33,7 @@ class Robot(Agent):
     def step(self):
         # If it's the very first step, we need initial percepts from the model
         if not self.current_percepts:
-            self.current_percepts = self.model.get_initial_percepts(self)
+            self.current_percepts = self.model.get_percepts(self)
 
         # Update knowledge based on new percepts and current real inventory
         self.knowledge = self.update(self.knowledge, self.current_percepts)
@@ -57,33 +57,33 @@ class Robot(Agent):
         # 2. Sync the knowledge inventory with the real physical inventory 
         knowledge["inventory"] = self.wastes.copy()
         
-        # Map integer colors to our string-based data structure
-        color_mapping = {1: "green", 2: "yellow", 3: "red"}
+        # # Map integer colors to our string-based data structure
+        # color_mapping = {1: "green", 2: "yellow", 3: "red"}
         
-        # 3. Parse adjacency_grid into clean data for adjacent_squares
-        parsed_squares = {}
-        for pos, agents_list in percepts["adjacency_grid"].items():
+        # # 3. Parse adjacency_grid into clean data for adjacent_squares
+        # parsed_squares = {}
+        # for pos, agents_list in percepts["adjacency_grid"].items():
             
-            # Default information for a square
-            sq_info = {
-                "radioactivity_level": None,
-                "zone": 1, # Defaults to 1 if no radioactivity agent is found
-                "wastes": {"green": 0, "yellow": 0, "red": 0}
-            }
+        #     # Default information for a square
+        #     sq_info = {
+        #         "radioactivity_level": None,
+        #         "zone": 1, # Defaults to 1 if no radioactivity agent is found
+        #         "wastes": {"green": 0, "yellow": 0, "red": 0}
+        #     }
             
-            for obj in agents_list:
-                if isinstance(obj, Radioactivity):
-                    sq_info["zone"] = obj.zone
-                    sq_info["radioactivity_level"] = getattr(obj, 'level', None) 
+        #     for obj in agents_list:
+        #         if isinstance(obj, Radioactivity):
+        #             sq_info["zone"] = obj.zone
+        #             sq_info["radioactivity_level"] = getattr(obj, 'level', None) 
                 
-                elif isinstance(obj, Waste):
-                    # Translate integer to string key using the map
-                    color_name = color_mapping.get(obj.color)
-                    sq_info["wastes"][color_name] += 1
+        #         elif isinstance(obj, Waste):
+        #             # Translate integer to string key using the map
+        #             color_name = color_mapping.get(obj.color)
+        #             sq_info["wastes"][color_name] += 1
                         
-            parsed_squares[pos] = sq_info
+        #     parsed_squares[pos] = sq_info
             
-        knowledge["adjacent_squares"] = parsed_squares
+        # knowledge["adjacent_squares"] = parsed_squares
                     
         return knowledge
                 
@@ -149,7 +149,7 @@ class GreenAgent(Robot):
         # #     if valid_move:
         # #         possible_actions.append({"type": "move", "target": pos})
 
-        # return random.choice(possible_actions)
+        return random.choice(possible_actions)
 
 
 class YellowAgent(Robot):
