@@ -15,8 +15,8 @@ import random
 
 class Robot(Agent):
     """ Robot Parent class """
-    def __init__(self, unique_id, model, pos):
-        super().__init__(unique_id, model)
+    def __init__(self, model, pos):
+        super().__init__(model)
         self.pos = pos
         
         # Real inventory (Will be modified by model.do() when actions succeed)
@@ -70,8 +70,8 @@ class Robot(Agent):
 
 class GreenAgent(Robot):
     """Green robot class: Handles Green Waste -> Yellow Waste"""
-    def __init__(self, unique_id, model, pos):
-        super().__init__(unique_id, model, pos)
+    def __init__(self, model, pos=(0,0)):
+        super().__init__(model, pos)
         self.type = "green"
     
     def deliberate(self, knowledge):
@@ -121,8 +121,8 @@ class GreenAgent(Robot):
 
 class YellowAgent(Robot):
     """Yellow robot class: Handles Yellow Waste -> Red Waste"""
-    def __init__(self, unique_id, model, pos):
-        super().__init__(unique_id, model, pos)
+    def __init__(self, model, pos):
+        super().__init__( model, pos)
         self.type = "yellow"
     
     def deliberate(self, knowledge):
@@ -171,8 +171,8 @@ class YellowAgent(Robot):
 
 class RedAgent(Robot):
     """Red robot class: Handles Red Waste -> Disposal Zone"""
-    def __init__(self, unique_id, model, pos):
-        super().__init__(unique_id, model, pos)
+    def __init__(self, model, pos):
+        super().__init__(model, pos)
         self.type = "red"
     
     def deliberate(self, knowledge):

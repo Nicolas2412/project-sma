@@ -63,7 +63,14 @@ def agent_portrayal(agent):
             portrayal["color"] = "#ecac0a"  # Jaune clair
         elif agent.color == 3:
             portrayal["color"] = "#e41300"  # Rouge clair
-
+            
+    elif isinstance(agent, GreenAgent):
+        # On définit la couleur selon la zone
+        portrayal["marker"] = "o"
+        portrayal["size"] = 10
+        portrayal["zorder"] = 1
+        portrayal["color"] = "#154e0e"
+        
     return portrayal
 
 model = RobotModel(**model_params, seed=0)

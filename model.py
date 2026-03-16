@@ -91,6 +91,16 @@ class RobotModel(mesa.Model):
         for a, i, j in zip(red_wastes, x, y):
             # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
+            
+        green_agents = GreenAgent.create_agents(model=self, n=n_green_agents)
+        # Create x and y positions for agents
+        x = self.rng.integers(0, self.width_z1, size=(n_green_agents,))
+        y = self.rng.integers(0, self.grid.height, size=(n_green_agents,))
+        for a, i, j in zip(green_agents, x, y):
+            # Add the agent to a random grid cell
+            self.grid.place_agent(a, (i, j))
+            
+            
     # def do(self, agent:mesa.Agent, action:str):
         
         # if action == "move_up":
