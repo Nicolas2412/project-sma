@@ -157,7 +157,7 @@ class RobotModel(mesa.Model):
 
     def get_percepts(self, agent:Robot):
         
-        percepts = {'pos': agent.pos}
+        percepts = {'current_pos': agent.pos}
         
         return percepts
         
