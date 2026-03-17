@@ -19,13 +19,13 @@ class Robot(Agent):
         super().__init__(model)
         
         # Real inventory (Will be modified by model.do() when actions succeed)
-        self.wastes = {"green": 0, "yellow": 0, "red": 0}
+        self.wastes = {1: 0, 2: 0, 3: 0}
         
         # Strictly structured knowledge base
         self.knowledge = {
             "current_pos": None,
             "inventory": self.wastes.copy(),
-            "adjacent_squares": {}
+            "grid": {}
         }
         
         self.current_percepts = None
@@ -36,57 +36,29 @@ class Robot(Agent):
             self.current_percepts = self.model.get_percepts(self)
 
         # Update knowledge based on new percepts and current real inventory
-        self.knowledge = self.update(self.knowledge, self.current_percepts)
-        
+        self.update(self.current_percepts)
         # Deliberate to choose an action (pass ONLY knowledge)
         action = self.deliberate(self.knowledge)
         
         # Do action in environment, environment returns new percepts
-        # percepts format: {"current_pos": (x, y), "adjacency_grid": {(x, y): [agents]}}
+        # percepts format: {"current_pos": (x, y), "adjency_grid": {(x, y): [agents]}}
         self.current_percepts = self.model.do(self, action)
-            
-    def update(self, knowledge, percepts):
+        
+    def update(self, percepts):
         """
         Updates the agent's knowledge base using the percepts dictionary.
         Parses raw agents into pure data for the reasoning engine.
         Handles int-to-string mapping for Waste colors (1: green, 2: yellow, 3: red).
         """
         # 1. Update Position directly from percepts
-        knowledge["current_pos"] = percepts["current_pos"]
+        self.knowledge["current_pos"] = percepts["current_pos"]
         
         # 2. Sync the knowledge inventory with the real physical inventory 
-        knowledge["inventory"] = self.wastes.copy()
+        self.knowledge["inventory"] = self.wastes.copy()
         
-        # # Map integer colors to our string-based data structure
-        # color_mapping = {1: "green", 2: "yellow", 3: "red"}
+        self.knowledge["grid"].update(percepts["grid"])
         
-        # # 3. Parse adjacency_grid into clean data for adjacent_squares
-        # parsed_squares = {}
-        # for pos, agents_list in percepts["adjacency_grid"].items():
-            
-        #     # Default information for a square
-        #     sq_info = {
-        #         "radioactivity_level": None,
-        #         "zone": 1, # Defaults to 1 if no radioactivity agent is found
-        #         "wastes": {"green": 0, "yellow": 0, "red": 0}
-        #     }
-            
-        #     for obj in agents_list:
-        #         if isinstance(obj, Radioactivity):
-        #             sq_info["zone"] = obj.zone
-        #             sq_info["radioactivity_level"] = getattr(obj, 'level', None) 
-                
-        #         elif isinstance(obj, Waste):
-        #             # Translate integer to string key using the map
-        #             color_name = color_mapping.get(obj.color)
-        #             sq_info["wastes"][color_name] += 1
-                        
-        #     parsed_squares[pos] = sq_info
-            
-        # knowledge["adjacent_squares"] = parsed_squares
-                    
-        return knowledge
-                
+
     def deliberate(self, knowledge):
         """To be overridden by child classes. MUST NOT use 'self.xxx' variables."""
         pass
@@ -108,30 +80,30 @@ class GreenAgent(Robot):
                             {"type": "move", "target": (x + 1, y)},
                             {"type": "move", "target": (x + -1, y)}
                             ] 
-        # current_pos = knowledge["current_pos"]
-        # inventory = knowledge["inventory"]
-        # adj_squares = knowledge["adjacent_squares"]
         
-        # inventory = knowledge["inventory"]
-        # percepts = knowledge["percepts"]
-        # current_pos = knowledge["current_pos"]
+        current_pos = knowledge["current_pos"]
+        inventory = knowledge["inventory"]
         
-        # # --- 1. TRANSFORMATION & PUT AWAY ---
-        # if inventory["green"] >= 2:
-        #     possible_actions.append({"type": "transform"})
-            
-        # if inventory["yellow"] > 0:
-        #     possible_actions.append({"type": "put"})
+        # Transformation
+        if inventory[1] == 2:
+            return {"type": "transform"}
+        
+        # Puting away
+        if inventory[2] == 1 and self.knowledge["grid"][current_pos]["drop"]:
+            return {"type": "put"}
 
         # # --- 2. PICK UP WASTE ---
         # # Look at the parsed data for our current coordinate
-        # if inventory["green"] < 2 and inventory["yellow"] == 0:
-        #     if current_pos in adj_squares:
-        #         if adj_squares[current_pos]["wastes"]["green"] > 0:
-        #             # We no longer pass the raw object. We pass the INTENT to pick a color.
-        #             possible_actions.append({"type": "pick"})
-
+        if inventory[1] < 2 and inventory[2] == 0 and \
+            knowledge['grid'][current_pos]['wastes'][1] > 0:
+            return {"type": "pick"}
+        
         # # --- 3. MOVEMENT ---
+        
+        if inventory[2] == 1:
+            x, y = current_pos
+            return {"type": "move", "target": (x + 1, y)}
+        
         # for pos, sq_info in adj_squares.items():
         #     if pos == current_pos:
         #         continue
@@ -159,42 +131,36 @@ class YellowAgent(Robot):
         self.type = 2
     
     def deliberate(self, knowledge):
-        possible_actions = [{"type": "stay"}]
-        
+        x, y = knowledge["current_pos"]
+
+        possible_actions = [{"type": "move", "target": (x, y + 1)},
+                            {"type": "move", "target": (x, y - 1)},
+                            {"type": "move", "target": (x + 1, y)},
+                            {"type": "move", "target": (x + -1, y)}
+                            ]
+
         current_pos = knowledge["current_pos"]
         inventory = knowledge["inventory"]
-        adj_squares = knowledge["adjacent_squares"]
-        
-        # --- 1. TRANSFORMATION & PUT AWAY ---
-        if inventory["yellow"] >= 2:
-            possible_actions.append({"type": "transform"})
-            
-        if inventory["red"] > 0:
-            possible_actions.append({"type": "put"})
 
-        # --- 2. PICK UP WASTE ---
-        if inventory["yellow"] < 2 and inventory["red"] == 0:
-            if current_pos in adj_squares:
-                if adj_squares[current_pos]["wastes"]["yellow"] > 0:
-                    possible_actions.append({"type": "pick"})
+        # Transformation
+        if inventory[2] == 2:
+            return {"type": "transform"}
 
-        # --- 3. MOVEMENT ---
-        for pos, sq_info in adj_squares.items():
-            if pos == current_pos:
-                continue
-                
-            valid_move = True
-            
-            # DIRECTION RESTRICTION: Do not move West if holding red waste
-            if inventory["red"] > 0 and pos[0] < current_pos[0]:
-                valid_move = False
+        # Puting away
+        if inventory[3] == 1 and self.knowledge["grid"][current_pos]["drop"] and self.knowledge["grid"][current_pos]["zone"] == 2:
+            return {"type": "put"}
 
-            # ZONE RESTRICTION
-            if sq_info["zone"] > 2:
-                valid_move = False
-            
-            if valid_move:
-                possible_actions.append({"type": "move", "target": pos})
+        # # --- 2. PICK UP WASTE ---
+        # # Look at the parsed data for our current coordinate
+        if inventory[2] < 2 and inventory[3] == 0 and \
+                knowledge['grid'][current_pos]['wastes'][2] > 0:
+            return {"type": "pick"}
+
+        # # --- 3. MOVEMENT ---
+
+        if inventory[3] == 1:
+            x, y = current_pos
+            return {"type": "move", "target": (x + 1, y)}
 
         return random.choice(possible_actions)
     
@@ -206,35 +172,46 @@ class RedAgent(Robot):
         self.type = 3
         
     def deliberate(self, knowledge):
-        possible_actions = [{"type": "stay"}]
-        
+        x, y = knowledge["current_pos"]
+
+        possible_actions = [{"type": "move", "target": (x, y + 1)},
+                            {"type": "move", "target": (x, y - 1)},
+                            {"type": "move", "target": (x + 1, y)},
+                            {"type": "move", "target": (x + -1, y)}
+                            ]
+
         current_pos = knowledge["current_pos"]
         inventory = knowledge["inventory"]
-        adj_squares = knowledge["adjacent_squares"]
-        
-        # --- 1. PUT AWAY ---
-        if inventory["red"] > 0:
-            possible_actions.append({"type": "put"})
 
-        # --- 2. PICK UP WASTE ---
-        if inventory["red"] < 1:
-            if current_pos in adj_squares:
-                if adj_squares[current_pos]["wastes"]["red"] > 0:
-                    possible_actions.append({"type": "pick"})
+        # Puting away
+        if inventory[3] == 1 and self.knowledge["grid"][current_pos]["drop"] and self.knowledge["grid"][current_pos]["zone"] == 3:
+            return {"type": "put"}
+
+        # # --- 2. PICK UP WASTE ---
+        # # Look at the parsed data for our current coordinate
+        if  inventory[3] == 0 and \
+                knowledge['grid'][current_pos]['wastes'][3] > 0:
+            return {"type": "pick"}
+
+        # # --- 3. MOVEMENT ---
+
+        if inventory[3] == 1:
+            x, y = current_pos
+            return {"type": "move", "target": (x + 1, y)}
 
         # --- 3. MOVEMENT ---
-        for pos, sq_info in adj_squares.items():
-            if pos == current_pos:
-                continue
+        # for pos, sq_info in adj_squares.items():
+        #     if pos == current_pos:
+        #         continue
                 
-            valid_move = True
+        #     valid_move = True
             
-            # DIRECTION RESTRICTION: Do not move West if holding red waste
-            if inventory["red"] > 0 and pos[0] < current_pos[0]:
-                valid_move = False
+        #     # DIRECTION RESTRICTION: Do not move West if holding red waste
+        #     if inventory["red"] > 0 and pos[0] < current_pos[0]:
+        #         valid_move = False
                 
-            # No zone restrictions for red robots
-            if valid_move:
-                possible_actions.append({"type": "move", "target": pos})
+        #     # No zone restrictions for red robots
+        #     if valid_move:
+        #         possible_actions.append({"type": "move", "target": pos})
 
         return random.choice(possible_actions)
