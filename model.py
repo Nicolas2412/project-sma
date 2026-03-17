@@ -175,8 +175,6 @@ class RobotModel(mesa.Model):
                         agent.wastes[agent.type] -= 1
                         break
                 else:
-                    print(agent.type, agent_on_pos.type,
-                          agent.wastes[agent_on_pos.type])
                     if isinstance(agent_on_pos, WasteDisposalZone) and agent.type == agent_on_pos.type and agent.wastes[agent.type+1] == 1:
                         agent.wastes[agent.type+1] = 0
                         waste= Waste(self, agent.type+1)

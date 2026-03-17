@@ -9,6 +9,9 @@
 # FILE: server.py
 ################################################################################
 
+import numpy as np
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import mesa
 import solara
 from agents import *
@@ -20,49 +23,157 @@ import warnings
 warnings.filterwarnings("ignore", message=".*unfilled marker.*")
 
 model_params = {
-    "n_green_agents" : 1,
-    "n_yellow_agents" : 2,
-    "n_red_agents" : 2,
-    "n_green_wastes" : 20,
-    "n_yellow_wastes" : 2,
-    "n_red_wastes" : 2,
-    "height" : 10,
-    "width_z1" : 10,
-    "width_z2" : 5,
-    "width_z3" : 3,
+    "height": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Height:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
+    "width_z1": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Width of zone 1:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
+    "width_z2": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Width of zone 1:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
+    "width_z3": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Width of zone 1:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
+    "n_green_agents": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Number of green agents:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
+    "n_yellow_agents": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Number of yellow agents:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
+    "n_red_agents": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Number of red agents:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
+    "n_green_wastes": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Number of green wastes:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
+    "n_yellow_wastes": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Number of yellow wastes:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
+    "n_red_wastes": {
+        "type": "SliderInt",
+        "value": 5,
+        "label": "Number of red wastes:",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+    },
     }
 
+initial_params = {
+    "n_green_agents": 1,
+    "n_yellow_agents": 1,
+    "n_red_agents": 1,
+    "n_green_wastes": 3,
+    "n_yellow_wastes": 3,
+    "n_red_wastes": 3,
+    "height": 5,
+    "width_z1": 5,
+    "width_z2": 5,
+    "width_z3": 5,
+}
 
 style = """
-    .mesa-viz-component {
-        width: 100% !important;
-        max-width: none !important;
+    .vue-grid-item {
+        width: 90vw !important;
+        height: 80vh !important;
+        transform: translate3d(10px, 10px, 0px) !important;
     }
-    .v-card {
-        width: 100% !important;
+    .vue-grid-layout {
+        height: 80vh !important;
+    }
+    .widget-image {
+        width: 80% !important;
+        height: 80% !important;
+        object-fit: contain !important;
     }
 """
 
-
 def configure_axes(ax):
     ax.set_aspect('equal', adjustable='box') # Force le ratio 1:1
-    ax.axis('off')                            # Supprime les numéros (0, 5, 10...)
+    ax.axis('off')
+    for line in ax.get_lines():
+        line.set_color("#4e4e4e")   # color
+        line.set_linewidth(0.7)     # thickness
+        line.set_linestyle("-")    # '--', ':', '-', '-.'
+        line.set_alpha(0.4)         # transparency
     return ax
 
 
 def agent_portrayal(agent):
-    if isinstance(agent, WasteDisposalZone):
-        colors = {1: "#73ff78", 2: "#ffe482", 3: "#f59188"}
-        return AgentPortrayalStyle(marker="s", 
-                                color=colors[agent.type],  
-                                size=None, 
-                                zorder=1, 
-                                edgecolors="black",
-                                linewidths=0.5)
 
-    elif isinstance(agent, Radioactivity):
-        colors = {1: "#73ff78", 2: "#ffe482", 3: "#f59188"}
-        return AgentPortrayalStyle(marker="s", color=colors[agent.type], size=None, zorder=1)
+    if isinstance(agent, Radioactivity):
+        if agent.type == 1:
+            # 0 to 1/3: very pale to medium green
+            low, high = "#cfffc4", "#5bff45"
+        elif agent.type == 2:
+            # 1/3 to 2/3: very pale to medium yellow
+            low, high = "#fbffc2", "#fff825"
+        elif agent.type == 3:
+            # 2/3 to 1: very pale to medium red
+            low, high = "#ffaea5", "#ff4343"
+
+        zone_ranges = {1: (0, 1/3), 2: (1/3, 2/3), 3: (2/3, 1)}
+        zone_min, zone_max = zone_ranges[agent.type]
+        norm = np.clip((agent.radioactivity - zone_min) /
+                    (zone_max - zone_min), 0, 1)
+
+        low_rgb = mcolors.to_rgb(low)
+        high_rgb = mcolors.to_rgb(high)
+
+        r = low_rgb[0] + norm * (high_rgb[0] - low_rgb[0])
+        g = low_rgb[1] + norm * (high_rgb[1] - low_rgb[1])
+        b = low_rgb[2] + norm * (high_rgb[2] - low_rgb[2])
+
+        color = mcolors.to_hex((r, g, b))
+        if isinstance(agent, WasteDisposalZone):
+            return AgentPortrayalStyle(marker="s", color=color, size=100, zorder=1, edgecolors="black", linewidths=0.5)
+        return AgentPortrayalStyle(marker="s", color=color, size=100, zorder=1)
 
     elif isinstance(agent, Waste):
         colors = {1: "#165c0c", 2: "#ff8000", 3: "#cd1a06"}
@@ -75,9 +186,9 @@ def agent_portrayal(agent):
             color = "#ff8000"
         elif isinstance(agent, RedAgent):
             color = "#cd1a06"
-        return AgentPortrayalStyle(marker="o", color=color, size=80, zorder=20)
+        return AgentPortrayalStyle(marker="o", color=color, size=70, zorder=20)
 
-model = RobotModel(**model_params, seed=0)
+model = RobotModel(**initial_params)
 
 SpaceGraph = make_space_component(agent_portrayal, 
                                 post_process=configure_axes)
