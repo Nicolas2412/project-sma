@@ -89,7 +89,8 @@ class GreenAgent(Robot):
             return {"type": "transform"}
         
         # Puting away
-        if inventory[2] == 1 and self.knowledge["grid"][current_pos]["drop"]:
+        x,y = current_pos
+        if inventory[2] == 1 and self.knowledge["grid"][(x+1, y)]["zone"] == self.type+1:
             return {"type": "put"}
 
         # # --- 2. PICK UP WASTE ---
@@ -104,23 +105,6 @@ class GreenAgent(Robot):
             x, y = current_pos
             return {"type": "move", "target": (x + 1, y)}
         
-        # for pos, sq_info in adj_squares.items():
-        #     if pos == current_pos:
-        #         continue
-                
-        # #     valid_move = True
-            
-        #     # DIRECTION RESTRICTION: Do not move West if holding yellow waste
-        #     if inventory["yellow"] > 0 and pos[0] < current_pos[0]:
-        #         valid_move = False
-
-        #     # ZONE RESTRICTION
-        #     if sq_info["zone"] > 1:
-        #         valid_move = False
-            
-        # #     if valid_move:
-        # #         possible_actions.append({"type": "move", "target": pos})
-
         return random.choice(possible_actions)
 
 
@@ -147,7 +131,8 @@ class YellowAgent(Robot):
             return {"type": "transform"}
 
         # Puting away
-        if inventory[3] == 1 and self.knowledge["grid"][current_pos]["drop"] and self.knowledge["grid"][current_pos]["zone"] == 2:
+        x, y = current_pos
+        if inventory[3] == 1 and self.knowledge["grid"][(x+1, y)]["zone"] == self.type+1:
             return {"type": "put"}
 
         # # --- 2. PICK UP WASTE ---
@@ -197,21 +182,13 @@ class RedAgent(Robot):
 
         if inventory[3] == 1:
             x, y = current_pos
-            return {"type": "move", "target": (x + 1, y)}
-
-        # --- 3. MOVEMENT ---
-        # for pos, sq_info in adj_squares.items():
-        #     if pos == current_pos:
-        #         continue
-                
-        #     valid_move = True
             
-        #     # DIRECTION RESTRICTION: Do not move West if holding red waste
-        #     if inventory["red"] > 0 and pos[0] < current_pos[0]:
-        #         valid_move = False
-                
-        #     # No zone restrictions for red robots
-        #     if valid_move:
-        #         possible_actions.append({"type": "move", "target": pos})
+            if x == self.model.total_width - 1:
+                return random.choice([
+                    {"type": "move", "target": (x, y + 1)},
+                    {"type": "move", "target": (x, y - 1)}
+                ])
+
+            return {"type": "move", "target": (x + 1, y)}
 
         return random.choice(possible_actions)

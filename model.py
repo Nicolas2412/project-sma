@@ -49,34 +49,34 @@ class RobotModel(mesa.Model):
 
         self.grid = mesa.space.MultiGrid(self.total_width, height, False)
         
-        for i in range(self.width_z1-1):
+        for i in range(self.width_z1):
             for j in range(self.height):
                 agent = Radioactivity(self, zone=1)
                 self.grid.place_agent(agent, (i, j))
         
-        for j in range(self.height):
-            agent = WasteDisposalZone(self, zone=1)
-            self.grid.place_agent(agent, (self.width_z1-1, j))
+        # for j in range(self.height):
+        #     agent = WasteDisposalZone(self, zone=1)
+        #     self.grid.place_agent(agent, (self.width_z1-1, j))
             
-        for i in range(self.width_z1, self.width_z1 + self.width_z2 - 1):
+        for i in range(self.width_z1, self.width_z1 + self.width_z2):
             for j in range(self.height):
                 agent = Radioactivity(self, zone=2)
                 self.grid.place_agent(agent, (i, j))
         
-        for j in range(self.height):
-            agent = WasteDisposalZone(self, zone=2)
-            self.grid.place_agent(
-                agent, (self.width_z1 + self.width_z2 - 1, j))
+        # for j in range(self.height):
+        #     agent = WasteDisposalZone(self, zone=2)
+        #     self.grid.place_agent(
+        #         agent, (self.width_z1 + self.width_z2 - 1, j))
             
-        for i in range(self.width_z1 + self.width_z2, self.total_width - 1):
+        for i in range(self.width_z1 + self.width_z2, self.total_width):
+            if i == self.total_width-1:
+                disposal = self.rng.integers(0, self.height)
             for j in range(self.height):
-                agent = Radioactivity(self, zone=3)
+                if i == self.total_width-1 and j == disposal:
+                    agent = WasteDisposalZone(self, zone=3)
+                else:
+                    agent = Radioactivity(self, zone=3)
                 self.grid.place_agent(agent, (i, j))
-        
-        for j in range(self.height):
-            agent = WasteDisposalZone(self, zone=3)
-            self.grid.place_agent(
-                agent, (self.total_width - 1, j))
         
         
         green_wastes = Waste.create_agents(model=self, n=n_green_wastes, color=1)
@@ -133,9 +133,7 @@ class RobotModel(mesa.Model):
             # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
-            
     def do(self, agent:Robot, action:str):
-        
         action_type = action["type"]
         
         if action_type == "move": 
@@ -171,16 +169,15 @@ class RobotModel(mesa.Model):
             agents_on_pos = self.grid.get_cell_list_contents([agent.pos])
             for agent_on_pos in agents_on_pos:
                 if isinstance(agent, RedAgent):
-                    if isinstance(agent_on_pos, WasteDisposalZone) and agent.type == agent_on_pos.type and agent.wastes[agent.type] == 1:
+                    if agent.wastes[agent.type] == 1:
                         agent.wastes[agent.type] -= 1
                         break
                 else:
-                    if isinstance(agent_on_pos, WasteDisposalZone) and agent.type == agent_on_pos.type and agent.wastes[agent.type+1] == 1:
+                    if agent.wastes[agent.type+1] == 1:
                         agent.wastes[agent.type+1] = 0
                         waste= Waste(self, agent.type+1)
                         self.grid.place_agent(waste, agent.pos)
                         break
-                    
                 
         elif action_type == "transform":
             if agent.wastes[agent.type] == 2:
