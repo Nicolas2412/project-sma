@@ -9,6 +9,7 @@
 # FILE: server.py
 ################################################################################
 
+from matplotlib.figure import Figure
 import numpy as np
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -20,12 +21,14 @@ from model import RobotModel
 from mesa.visualization import SolaraViz, make_plot_component, make_space_component
 from mesa.visualization.components import AgentPortrayalStyle
 import warnings
+from mesa.visualization.utils import update_counter
+
 warnings.filterwarnings("ignore", message=".*unfilled marker.*")
 
 model_params = {
     "height": {
         "type": "SliderInt",
-        "value": 5,
+        "value": 10,
         "label": "Height:",
         "min": 1,
         "max": 10,
@@ -33,7 +36,7 @@ model_params = {
     },
     "width_z1": {
         "type": "SliderInt",
-        "value": 5,
+        "value": 10,
         "label": "Width of zone 1:",
         "min": 1,
         "max": 10,
@@ -41,23 +44,23 @@ model_params = {
     },
     "width_z2": {
         "type": "SliderInt",
-        "value": 5,
-        "label": "Width of zone 1:",
+        "value": 10,
+        "label": "Width of zone 2:",
         "min": 1,
         "max": 10,
         "step": 1,
     },
     "width_z3": {
         "type": "SliderInt",
-        "value": 5,
-        "label": "Width of zone 1:",
+        "value": 10,
+        "label": "Width of zone 3:",
         "min": 1,
         "max": 10,
         "step": 1,
     },
     "n_green_agents": {
         "type": "SliderInt",
-        "value": 5,
+        "value": 10,
         "label": "Number of green agents:",
         "min": 1,
         "max": 10,
@@ -65,7 +68,7 @@ model_params = {
     },
     "n_yellow_agents": {
         "type": "SliderInt",
-        "value": 5,
+        "value": 10,
         "label": "Number of yellow agents:",
         "min": 1,
         "max": 10,
@@ -73,7 +76,7 @@ model_params = {
     },
     "n_red_agents": {
         "type": "SliderInt",
-        "value": 5,
+        "value": 10,
         "label": "Number of red agents:",
         "min": 1,
         "max": 10,
@@ -81,7 +84,7 @@ model_params = {
     },
     "n_green_wastes": {
         "type": "SliderInt",
-        "value": 5,
+        "value": 10,
         "label": "Number of green wastes:",
         "min": 1,
         "max": 10,
@@ -106,27 +109,19 @@ model_params = {
     }
 
 initial_params = {
-    "n_green_agents": 1,
-    "n_yellow_agents": 1,
-    "n_red_agents": 1,
-    "n_green_wastes": 3,
-    "n_yellow_wastes": 3,
-    "n_red_wastes": 3,
-    "height": 5,
-    "width_z1": 5,
-    "width_z2": 5,
-    "width_z3": 5,
+    "n_green_agents": 10,
+    "n_yellow_agents": 10,
+    "n_red_agents": 10,
+    "n_green_wastes": 10,
+    "n_yellow_wastes": 10,
+    "n_red_wastes": 10,
+    "height": 10,
+    "width_z1": 10,
+    "width_z2": 10,
+    "width_z3": 10,
 }
 
 style = """
-    .vue-grid-item {
-        width: 90vw !important;
-        height: 80vh !important;
-        transform: translate3d(10px, 10px, 0px) !important;
-    }
-    .vue-grid-layout {
-        height: 80vh !important;
-    }
     .widget-image {
         width: 80% !important;
         height: 80% !important;
@@ -189,9 +184,18 @@ def agent_portrayal(agent):
         return AgentPortrayalStyle(marker="o", color=color, size=70, zorder=20)
 
 model = RobotModel(**initial_params)
-
 SpaceGraph = make_space_component(agent_portrayal, 
                                 post_process=configure_axes)
+
+
+def remove_legend(ax):
+    ax.get_legend().remove()
+    ax.set_ylim(bottom=0)
+    return ax
+
+
+WastePlot = make_plot_component(
+    {"Green Waste": "green", "Yellow Waste": "orange", "Red Waste": "red"}, post_process=remove_legend)
 
 
 # Create the Dashboard
@@ -200,7 +204,7 @@ def StyledDashboard():
     solara.Style(style)
     SolaraViz(
         model,
-        components=[SpaceGraph],
+        components=[SpaceGraph, WastePlot],
         model_params=model_params,
     )
 

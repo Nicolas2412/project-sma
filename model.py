@@ -133,6 +133,16 @@ class RobotModel(mesa.Model):
             # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
+            
+        # Initialization of the data collector
+        self.datacollector = mesa.DataCollector(
+            model_reporters={
+                "Green Waste": lambda m: sum(1 for a in m.agents if isinstance(a, Waste) and a.color == 1),
+                "Yellow Waste": lambda m: sum(1 for a in m.agents if isinstance(a, Waste) and a.color == 2),
+                "Red Waste": lambda m: sum(1 for a in m.agents if isinstance(a, Waste) and a.color == 3),
+            }
+        )
+
     def do(self, agent:Robot, action:str):
         action_type = action["type"]
         
@@ -153,37 +163,40 @@ class RobotModel(mesa.Model):
                     self.grid.move_agent(agent, new_pos)
         
         elif action_type == "pick":
-            if (isinstance(agent, RedAgent) and agent.wastes[agent.type] == 1) or \
+            if (isinstance(agent, RedAgent) and len(agent.wastes[agent.type]) == 1) or \
                 ((isinstance(agent, YellowAgent) or isinstance(agent, GreenAgent)) and \
-                    (agent.wastes[agent.type] == 2 or agent.wastes[agent.type + 1] == 1)):
+                    (len(agent.wastes[agent.type]) == 2 or len(agent.wastes[agent.type + 1]) == 1)):
                 pass #Action not feasable
             else:
                 agents_on_new_pos = self.grid.get_cell_list_contents([agent.pos])
                 for agent_on_new_pos in agents_on_new_pos:
                     if isinstance(agent_on_new_pos, Waste) and agent_on_new_pos.color == agent.type:
-                        agent.wastes[agent.type] += 1
+                        agent.wastes[agent.type].append(agent_on_new_pos)
                         self.grid.remove_agent(agent_on_new_pos)
                         break
                     
         elif action_type == "put":
             agents_on_pos = self.grid.get_cell_list_contents([agent.pos])
-            for agent_on_pos in agents_on_pos:
-                if isinstance(agent, RedAgent):
-                    if agent.wastes[agent.type] == 1:
-                        agent.wastes[agent.type] -= 1
-                        break
-                else:
-                    if agent.wastes[agent.type+1] == 1:
-                        agent.wastes[agent.type+1] = 0
-                        waste= Waste(self, agent.type+1)
-                        self.grid.place_agent(waste, agent.pos)
-                        break
+            if isinstance(agent, RedAgent):
+                if len(agent.wastes[agent.type]) == 1:
+                    waste = agent.wastes[agent.type].pop()
+                    waste.remove()
+                    agent.wastes[agent.type] = []
+            elif len(agent.wastes[agent.type + 1]) == 1:
+                waste = agent.wastes[agent.type + 1].pop()
+                self.grid.place_agent(waste, agent.pos)
+                agent.wastes[agent.type + 1] = []
                 
         elif action_type == "transform":
-            if agent.wastes[agent.type] == 2:
-                agent.wastes[agent.type] = 0
-                agent.wastes[agent.type + 1] = 1
-
+            if len(agent.wastes[agent.type]) == 2:
+                # Supprimer les 2 déchets portés
+                for waste in agent.wastes[agent.type]:
+                    waste.remove()
+                agent.wastes[agent.type] = []
+                # Créer le nouveau déchet de niveau supérieur
+                new_waste = Waste(self, color=agent.type + 1)
+                agent.wastes[agent.type + 1].append(new_waste)
+                
         else:
             raise ValueError(f"Unknown action type: {action_type}")
                 
@@ -230,3 +243,4 @@ class RobotModel(mesa.Model):
     def step(self):
         """do one step of the model"""
         self.agents.shuffle_do("step")
+        self.datacollector.collect(self)

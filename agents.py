@@ -19,7 +19,7 @@ class Robot(Agent):
         super().__init__(model)
         
         # Real inventory (Will be modified by model.do() when actions succeed)
-        self.wastes = {1: 0, 2: 0, 3: 0}
+        self.wastes = {1: [], 2: [], 3: []}
         
         # Strictly structured knowledge base
         self.knowledge = {
@@ -85,23 +85,23 @@ class GreenAgent(Robot):
         inventory = knowledge["inventory"]
         
         # Transformation
-        if inventory[1] == 2:
+        if len(inventory[1]) == 2:
             return {"type": "transform"}
         
         # Puting away
         x,y = current_pos
-        if inventory[2] == 1 and self.knowledge["grid"][(x+1, y)]["zone"] == self.type+1:
+        if len(inventory[2]) == 1 and self.knowledge["grid"][(x+1, y)]["zone"] == self.type+1:
             return {"type": "put"}
 
         # # --- 2. PICK UP WASTE ---
         # # Look at the parsed data for our current coordinate
-        if inventory[1] < 2 and inventory[2] == 0 and \
+        if len(inventory[1]) < 2 and len(inventory[2]) == 0 and \
             knowledge['grid'][current_pos]['wastes'][1] > 0:
             return {"type": "pick"}
         
         # # --- 3. MOVEMENT ---
         
-        if inventory[2] == 1:
+        if len(inventory[2]) == 1:
             x, y = current_pos
             return {"type": "move", "target": (x + 1, y)}
         
@@ -127,23 +127,23 @@ class YellowAgent(Robot):
         inventory = knowledge["inventory"]
 
         # Transformation
-        if inventory[2] == 2:
+        if len(inventory[2]) == 2:
             return {"type": "transform"}
 
         # Puting away
         x, y = current_pos
-        if inventory[3] == 1 and self.knowledge["grid"][(x+1, y)]["zone"] == self.type+1:
+        if len(inventory[3]) == 1 and self.knowledge["grid"][(x+1, y)]["zone"] == self.type+1:
             return {"type": "put"}
 
         # # --- 2. PICK UP WASTE ---
         # # Look at the parsed data for our current coordinate
-        if inventory[2] < 2 and inventory[3] == 0 and \
+        if len(inventory[2]) < 2 and len(inventory[3]) == 0 and \
                 knowledge['grid'][current_pos]['wastes'][2] > 0:
             return {"type": "pick"}
 
         # # --- 3. MOVEMENT ---
 
-        if inventory[3] == 1:
+        if len(inventory[3]) == 1:
             x, y = current_pos
             return {"type": "move", "target": (x + 1, y)}
 
@@ -169,18 +169,18 @@ class RedAgent(Robot):
         inventory = knowledge["inventory"]
 
         # Puting away
-        if inventory[3] == 1 and self.knowledge["grid"][current_pos]["drop"] and self.knowledge["grid"][current_pos]["zone"] == 3:
+        if len(inventory[3]) == 1 and self.knowledge["grid"][current_pos]["drop"] and self.knowledge["grid"][current_pos]["zone"] == 3:
             return {"type": "put"}
 
         # # --- 2. PICK UP WASTE ---
         # # Look at the parsed data for our current coordinate
-        if  inventory[3] == 0 and \
+        if  len(inventory[3]) == 0 and \
                 knowledge['grid'][current_pos]['wastes'][3] > 0:
             return {"type": "pick"}
 
         # # --- 3. MOVEMENT ---
 
-        if inventory[3] == 1:
+        if len(inventory[3]) == 1:
             x, y = current_pos
             
             if x == self.model.total_width - 1:
