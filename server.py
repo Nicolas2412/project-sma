@@ -22,8 +22,23 @@ from mesa.visualization import SolaraViz, make_plot_component, make_space_compon
 from mesa.visualization.components import AgentPortrayalStyle
 import warnings
 from mesa.visualization.utils import update_counter
+from mesa import DataCollector
+import pandas as pd
 
 warnings.filterwarnings("ignore", message=".*unfilled marker.*")
+
+# Fix the datacollector class
+original_get = DataCollector.get_model_vars_dataframe
+
+def safe_get_model_vars_dataframe(self):
+    try:
+        return original_get(self)
+    except ValueError:
+        min_len = min(len(v) for v in self.model_vars.values())
+        truncated = {k: v[:min_len] for k, v in self.model_vars.items()}
+        return pd.DataFrame(truncated)
+
+DataCollector.get_model_vars_dataframe = safe_get_model_vars_dataframe
 
 model_params = {
     "height": {
@@ -129,19 +144,52 @@ style = """
     }
 """
 
+
 def configure_axes(ax):
-    ax.set_aspect('equal', adjustable='box') # Force le ratio 1:1
+    ax.set_aspect('equal', adjustable='box')
     ax.axis('off')
+
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    ax.set_xlim(xlim[0] + 0.0, xlim[1] + 0.0)
+    ax.set_ylim(ylim[0] + 0.0, ylim[1] + 0.0)
+    n_cols = int(xlim[1] - xlim[0])
+    n_rows = int(ylim[1] - ylim[0])
+
+    # Supprimer les lignes de grille de Mesa
     for line in ax.get_lines():
-        line.set_color("#4e4e4e")   # color
-        line.set_linewidth(0.7)     # thickness
-        line.set_linestyle("-")    # '--', ':', '-', '-.'
-        line.set_alpha(0.4)         # transparency
+        line.remove()
+
+    # Redessiner la grille alignée avec les markers
+    for x in range(n_cols + 1):
+        ax.axvline(x - 0.5, color="#4e4e4e", linewidth=0.7, alpha=0.4)
+    for y in range(n_rows + 1):
+        ax.axhline(y - 0.5, color="#4e4e4e", linewidth=0.7, alpha=0.4)
+
+    fig = ax.get_figure()
+    bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    width_inches = bbox.width
+    height_inches = bbox.height
+
+    cell_width_pts = (width_inches * 72) / n_cols
+    cell_height_pts = (height_inches * 72) / n_rows
+    cell_pts = min(cell_width_pts, cell_height_pts)
+    
+    for collection in ax.collections:
+        zorder = collection.get_zorder()
+        if zorder == 1:
+            collection.set_sizes([cell_pts ** 2])
+        elif zorder == 10:
+            collection.set_sizes([(cell_pts * 0.3) ** 2])
+        elif zorder == 20:
+            collection.set_sizes([(cell_pts * 0.7) ** 2])
+
     return ax
 
-
 def agent_portrayal(agent):
-
+    
+    cell_size = 1
+    
     if isinstance(agent, Radioactivity):
         if agent.type == 1:
             # 0 to 1/3: very pale to medium green
@@ -167,12 +215,12 @@ def agent_portrayal(agent):
 
         color = mcolors.to_hex((r, g, b))
         if isinstance(agent, WasteDisposalZone):
-            return AgentPortrayalStyle(marker="s", color=color, size=100, zorder=1, edgecolors="black", linewidths=0.5)
-        return AgentPortrayalStyle(marker="s", color=color, size=100, zorder=1)
+            return AgentPortrayalStyle(marker="s", color='black', size=cell_size, zorder=1)
+        return AgentPortrayalStyle(marker="s", color=color, size=cell_size, zorder=1)
 
     elif isinstance(agent, Waste):
         colors = {1: "#165c0c", 2: "#ff8000", 3: "#cd1a06"}
-        return AgentPortrayalStyle(marker="s", color=colors[agent.color], size=10, zorder=10)
+        return AgentPortrayalStyle(marker="s", color=colors[agent.color], size=cell_size/3, zorder=10)
 
     elif isinstance(agent, Robot):
         if isinstance(agent, GreenAgent):
@@ -181,7 +229,7 @@ def agent_portrayal(agent):
             color = "#ff8000"
         elif isinstance(agent, RedAgent):
             color = "#cd1a06"
-        return AgentPortrayalStyle(marker="o", color=color, size=70, zorder=20)
+        return AgentPortrayalStyle(marker="o", color=color, size=cell_size/2, zorder=20)
 
 model = RobotModel(**initial_params)
 SpaceGraph = make_space_component(agent_portrayal, 
@@ -204,7 +252,7 @@ def StyledDashboard():
     solara.Style(style)
     SolaraViz(
         model,
-        components=[SpaceGraph, WastePlot],
+        components=[SpaceGraph,WastePlot],
         model_params=model_params,
     )
 
