@@ -162,33 +162,30 @@ class RedAgent(Robot):
         possible_actions = [{"type": "move", "target": (x, y + 1)},
                             {"type": "move", "target": (x, y - 1)},
                             {"type": "move", "target": (x + 1, y)},
-                            {"type": "move", "target": (x + -1, y)}
+                            {"type": "move", "target": (x - 1, y)}
                             ]
 
         current_pos = knowledge["current_pos"]
         inventory = knowledge["inventory"]
 
-        # Puting away
-        if len(inventory[3]) == 1 and self.knowledge["grid"][current_pos]["drop"] and self.knowledge["grid"][current_pos]["zone"] == 3:
+        # Si déchet rouge + sur zone de dépôt -> put
+        if len(inventory[3]) == 1 and knowledge["grid"][current_pos]["drop"] and knowledge["grid"][current_pos]["zone"] == 3:
             return {"type": "put"}
 
-        # # --- 2. PICK UP WASTE ---
-        # # Look at the parsed data for our current coordinate
-        if  len(inventory[3]) == 0 and \
-                knowledge['grid'][current_pos]['wastes'][3] > 0:
-            return {"type": "pick"}
-
-        # # --- 3. MOVEMENT ---
-
-        if len(inventory[3]) == 1:
-            x, y = current_pos
-            
-            if x == self.model.total_width - 1:
-                return random.choice([
-                    {"type": "move", "target": (x, y + 1)},
-                    {"type": "move", "target": (x, y - 1)}
-                ])
-
+        # Si déchet rouge + pas à l'extrémité droite -> move droite
+        if len(inventory[3]) == 1 and x < self.model.total_width - 1:
             return {"type": "move", "target": (x + 1, y)}
 
+        # Si déchet rouge + à l'extrémité droite -> move haut ou bas
+        if len(inventory[3]) == 1 and x == self.model.total_width - 1:
+            return random.choice([
+                {"type": "move", "target": (x, y + 1)},
+                {"type": "move", "target": (x, y - 1)}
+            ])
+
+        # Si déchet rouge sur la case -> pick
+        if len(inventory[3]) == 0 and knowledge["grid"][current_pos]["wastes"][3] > 0:
+            return {"type": "pick"}
+
+        # Sinon -> move aléatoire
         return random.choice(possible_actions)

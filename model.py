@@ -142,50 +142,50 @@ class RobotModel(mesa.Model):
                 "Red Waste": lambda m: sum(1 for a in m.agents if isinstance(a, Waste) and a.color == 3),
             }
         )
+        
+        # Initialize grid cach, used to improve computation 
+        self._grid_cache = {}
+        for _, pos in self.grid.coord_iter():
+            self._update_cache_at(pos)
 
     def do(self, agent:Robot, action:str):
         action_type = action["type"]
         
         if action_type == "move": 
             new_pos = action["target"]
-            if not self.grid.out_of_bounds(new_pos):
-            
-                agents_on_new_pos = self.grid.get_cell_list_contents([new_pos])
-                perform = True
-                for agent_on_new_pos in agents_on_new_pos:
-                    if not isinstance(agent_on_new_pos, Radioactivity):
-                        pass
-                    else:
-                        if agent.type < agent_on_new_pos.type:
-                            # Invalid action
-                            perform = False
-                if perform:
+            if not self.grid.out_of_bounds(new_pos) and self._grid_cache[new_pos]["zone"] <= agent.type:
+                    old_pos = agent.pos
                     self.grid.move_agent(agent, new_pos)
+                    self._update_cache_at(old_pos)
+                    self._update_cache_at(new_pos)
         
         elif action_type == "pick":
             if (isinstance(agent, RedAgent) and len(agent.wastes[agent.type]) == 1) or \
                 ((isinstance(agent, YellowAgent) or isinstance(agent, GreenAgent)) and \
                     (len(agent.wastes[agent.type]) == 2 or len(agent.wastes[agent.type + 1]) == 1)):
                 pass #Action not feasable
-            else:
-                agents_on_new_pos = self.grid.get_cell_list_contents([agent.pos])
-                for agent_on_new_pos in agents_on_new_pos:
-                    if isinstance(agent_on_new_pos, Waste) and agent_on_new_pos.color == agent.type:
-                        agent.wastes[agent.type].append(agent_on_new_pos)
-                        self.grid.remove_agent(agent_on_new_pos)
+            elif self._grid_cache[agent.pos]["wastes"][agent.type] > 0:
+                agents_on_pos = self.grid.get_cell_list_contents([agent.pos])
+                for agent_on_pos in agents_on_pos:
+                    if isinstance(agent_on_pos, Waste) and agent_on_pos.color == agent.type:
+                        agent.wastes[agent.type].append(agent_on_pos)
+                        self.grid.remove_agent(agent_on_pos)
+                        self._update_cache_at(agent.pos)
                         break
+                
                     
         elif action_type == "put":
-            agents_on_pos = self.grid.get_cell_list_contents([agent.pos])
             if isinstance(agent, RedAgent):
                 if len(agent.wastes[agent.type]) == 1:
                     waste = agent.wastes[agent.type].pop()
                     waste.remove()
                     agent.wastes[agent.type] = []
+                    self._update_cache_at(agent.pos)
             elif len(agent.wastes[agent.type + 1]) == 1:
                 waste = agent.wastes[agent.type + 1].pop()
                 self.grid.place_agent(waste, agent.pos)
                 agent.wastes[agent.type + 1] = []
+                self._update_cache_at(agent.pos)
                 
         elif action_type == "transform":
             if len(agent.wastes[agent.type]) == 2:
@@ -203,44 +203,52 @@ class RobotModel(mesa.Model):
         percepts = self.get_percepts(agent)
         return percepts
     
-
-    def get_percepts(self, agent:Robot):
-        
-        percepts = {'current_pos': agent.pos,
-                    'grid': {}}
-        
+    def get_percepts(self, agent: Robot):
+        percepts = {'current_pos': agent.pos, 'grid': {}}
         neighboor_positions = self.grid.get_neighborhood(agent.pos, moore=True, include_center=True)
-        
-        
         for pos in neighboor_positions:
-            agents_at_pos = self.grid.get_cell_list_contents([pos])
-
-            # Default information for a square
-            sq_info = {
-                "radioactivity_level": None,
-                "zone": 1,  # Defaults to 1 if no radioactivity agent is found
-                "wastes": {1: 0, 2: 0, 3: 0},
-                "drop":False
-            }
-
-            for obj in agents_at_pos:
-                
-                if isinstance(obj, Radioactivity):
-                    sq_info["zone"] = obj.type
-                    sq_info["radioactivity_level"] = getattr(
-                        obj, 'level', None)
-                    if isinstance(obj, WasteDisposalZone):
-                        sq_info["drop"] = True
-                
-                elif isinstance(obj, Waste):
-                    # Translate integer to string key using the map
-                    sq_info["wastes"][obj.color] += 1
-            
-            percepts["grid"][pos] = sq_info
-            
+            if pos in self._grid_cache:
+                percepts["grid"][pos] = self._grid_cache[pos]
         return percepts
-        
+    
+    def _update_cache_at(self, pos):    
+        """Recompute cache for a single cell."""
+        agents_at_pos = self.grid.get_cell_list_contents([pos])
+        sq_info = {
+            "radioactivity_level": None,
+            "zone": 1,
+            "wastes": {1: 0, 2: 0, 3: 0},
+            "drop": False
+        }
+        for obj in agents_at_pos:
+            if isinstance(obj, Radioactivity):
+                sq_info["zone"] = obj.type
+                sq_info["radioactivity_level"] = getattr(obj, 'level', None)
+                if isinstance(obj, WasteDisposalZone):
+                    sq_info["drop"] = True
+            elif isinstance(obj, Waste):
+                sq_info["wastes"][obj.color] += 1
+        self._grid_cache[pos] = sq_info
+    
     def step(self):
         """do one step of the model"""
         self.agents.shuffle_do("step")
         self.datacollector.collect(self)
+        
+        # Vérifie s'il reste des déchets sur la grille
+        waste_on_grid = any(
+            isinstance(a, Waste) and a.pos is not None
+            for a in self.agents
+        )
+
+
+        # Vérifie si un robot a assez de déchets pour continuer à travailler
+        agents_still_working = any(
+            (isinstance(a, GreenAgent) and (len(a.wastes[1]) == 2 or len(a.wastes[2]) == 1)) or
+            (isinstance(a, YellowAgent) and (len(a.wastes[2]) == 2 or len(a.wastes[3]) == 1)) or
+            (isinstance(a, RedAgent) and (len(a.wastes[3]) == 1))
+            for a in self.agents
+        )
+        
+        if not waste_on_grid and not agents_still_working:
+            self.running = False
