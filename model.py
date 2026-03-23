@@ -149,7 +149,9 @@ class RobotModel(mesa.Model):
             self._update_cache_at(pos)
 
     def do(self, agent:Robot, action:str):
+        
         action_type = action["type"]
+        agent.cooldown_remaining = max(0, agent.cooldown_remaining - 1)
         
         if action_type == "move": 
             new_pos = action["target"]
@@ -173,26 +175,29 @@ class RobotModel(mesa.Model):
                         self._update_cache_at(agent.pos)
                         break
                 
-                    
         elif action_type == "put":
+            current_zone = self._grid_cache[agent.pos]["zone"]
+
             if isinstance(agent, RedAgent):
-                if len(agent.wastes[agent.type]) == 1:
-                    #TODO: add a check to see if we are on the waste disposal zone
+                if len(agent.wastes[agent.type]) == 1 and self._grid_cache[agent.pos]["drop"]:
                     waste = agent.wastes[agent.type].pop()
                     waste.remove()
                     agent.wastes[agent.type] = []
                     self._update_cache_at(agent.pos)
-            elif len(agent.wastes[agent.type + 1]) == 1:
+                    
+            elif len(agent.wastes[agent.type + 1]) == 1 and current_zone == agent.type : #Normal put in the frontier of next zone
                 waste = agent.wastes[agent.type + 1].pop()
                 self.grid.place_agent(waste, agent.pos)
                 agent.wastes[agent.type + 1] = []
                 self._update_cache_at(agent.pos)
-            elif len(agent.wastes[agent.type]) == 1:
+                
+            elif len(agent.wastes[agent.type]) == 1 and current_zone == agent.type: #Random drop
                 waste = agent.wastes[agent.type].pop()
                 self.grid.place_agent(waste, agent.pos)
                 agent.wastes[agent.type] = []
                 self._update_cache_at(agent.pos)
-                
+                agent.cooldown_remaining = agent.cooldown
+
         elif action_type == "transform":
             if len(agent.wastes[agent.type]) == 2:
                 # Supprimer les 2 déchets portés
@@ -210,7 +215,7 @@ class RobotModel(mesa.Model):
         return percepts
     
     def get_percepts(self, agent: Robot):
-        percepts = {'current_pos': agent.pos, 'grid': {}}
+        percepts = {'current_pos': agent.pos, 'cooldown_remaining': agent.cooldown_remaining, 'grid': {}}
         neighboor_positions = self.grid.get_neighborhood(agent.pos, moore=True, include_center=True)
         for pos in neighboor_positions:
             if pos in self._grid_cache:
