@@ -82,3 +82,7 @@ Grâce au dashboard dynamique, on observe bien la courbe de déchets verts et ja
 
 Certains déchets vert et jaune ne disparaissent pas dans certains cas, car ils sont bloqués dans les inventaires des robots sans pouvoir être transformés car plus aucun déchet du même type n'est au sol.
 Pour gérer ce problème, il faudrait rajouter une petite chance de `put` l'objet transporté au lieu de se déplacer lorsqu'un agent possède un seul objet de son type. Il faudrait alors adapter la condition de fin d'épisode également
+
+
+**Pistes à explorer :**
+- *Stratégie naive:* Stratégie purement aléatoire, à part le fait que lorsqu'un robot est sur un waste qu'il peut récupérer il le récupère, lorsqu'un robot vert ou jaune a transformé un waste au niveau supérieur il va jusqu'à la frontière et le drop, et lorsqu'un rouge récupère 
