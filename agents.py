@@ -13,6 +13,7 @@ from mesa import Agent
 import numpy as np
 from objects import Waste, Radioactivity
 import random
+from strategies.naive_strategy import naive_deliberate, naive_deliberate_red
 
 class Robot(Agent):
     """ Robot Parent class """
@@ -29,6 +30,7 @@ class Robot(Agent):
             "grid": {},
             "cooldown_remaining": 0
         }
+        
         self.cooldown = cooldown
         self.cooldown_remaining = 0
         
@@ -71,137 +73,40 @@ class Robot(Agent):
 
 class GreenAgent(Robot):
     """Green robot class: Handles Green Waste -> Yellow Waste"""
-    def __init__(self, model):
+    def __init__(self, model, strategy:str='naive'):
         super().__init__(model)
         self.type = 1
         self.epsilon = 0.05
-    
+        self.strategy = strategy
+        
     def deliberate(self, knowledge):
-        # "stay" acts as a fallback so random.choice() never crashes.
-        # possible_actions = [{"type": "stay"}] 
-        x, y = knowledge["current_pos"]
         
-        possible_actions = [{"type": "move", "target": (x, y +1)},
-                            {"type": "move", "target": (x , y -1)},
-                            {"type": "move", "target": (x + 1, y)},
-                            {"type": "move", "target": (x + -1, y)}
-                            ] 
-        
-        current_pos = knowledge["current_pos"]
-        inventory = knowledge["inventory"]
-        
-        # Transformation
-        if len(inventory[1]) == 2:
-            return {"type": "transform"}
-        
-        # Puting away
-        x,y = current_pos
-        if len(inventory[2]) == 1 and self.knowledge["grid"][(x+1, y)]["zone"] == self.type+1:
-            return {"type": "put"}
-        
-
-        # # --- 2. PICK UP WASTE ---
-        # # Look at the parsed data for our current coordinate
-        if len(inventory[1]) < 2 and len(inventory[2]) == 0 and \
-            knowledge['grid'][current_pos]['wastes'][1] > 0 and knowledge["cooldown_remaining"] == 0:
-            return {"type": "pick"}
-        
-        # # --- 3. MOVEMENT ---
-        
-        if len(inventory[2]) == 1:
-            x, y = current_pos
-            return {"type": "move", "target": (x + 1, y)}
-        
-        # Drop if holding one low level item with a little probabilty
-        if len(inventory[1]) == 1 and self.model.rng.random() < self.epsilon:
-            return {"type":"put"}
-        
-        return random.choice(possible_actions)
+        if self.strategy == 'naive':
+            return naive_deliberate(knowledge=knowledge, low_waste=1, high_waste=2, epsilon=self.epsilon)
 
 
 class YellowAgent(Robot):
     """Yellow robot class: Handles Yellow Waste -> Red Waste"""
-    def __init__(self, model):
+    def __init__(self, model, strategy:str='naive'):
         super().__init__(model)
         self.epsilon = 0.05
         self.type = 2
+        self.strategy = strategy
     
     def deliberate(self, knowledge):
-        x, y = knowledge["current_pos"]
 
-        possible_actions = [{"type": "move", "target": (x, y + 1)},
-                            {"type": "move", "target": (x, y - 1)},
-                            {"type": "move", "target": (x + 1, y)},
-                            {"type": "move", "target": (x + -1, y)}
-                            ]
-
-        current_pos = knowledge["current_pos"]
-        inventory = knowledge["inventory"]
-
-        # Transformation
-        if len(inventory[2]) == 2:
-            return {"type": "transform"}
-
-        # Puting away
-        x, y = current_pos
-        if len(inventory[3]) == 1 and self.knowledge["grid"][(x+1, y)]["zone"] == self.type+1:
-            return {"type": "put"}
-
-        # # --- 2. PICK UP WASTE ---
-        # # Look at the parsed data for our current coordinate
-        if len(inventory[2]) < 2 and len(inventory[3]) == 0 and \
-                knowledge['grid'][current_pos]['wastes'][2] > 0 and knowledge["cooldown_remaining"] == 0:
-            return {"type": "pick"}
-
-        # # --- 3. MOVEMENT ---
-
-        if len(inventory[3]) == 1:
-            x, y = current_pos
-            return {"type": "move", "target": (x + 1, y)}
-        
-        # Drop if holding one low level item with a little probabilty
-        if len(inventory[2]) == 1 and self.model.rng.random() < self.epsilon:
-            return {"type": "put"}
-
-        return random.choice(possible_actions)
+        if self.strategy == 'naive':
+            return naive_deliberate(knowledge=knowledge, low_waste=2, high_waste=3, epsilon=self.epsilon)
     
 
 class RedAgent(Robot):
     """Red robot class: Handles Red Waste -> Disposal Zone"""
-    def __init__(self, model):
+    def __init__(self, model, strategy:str='naive'):
         super().__init__(model)
         self.type = 3
+        self.strategy = strategy
         
     def deliberate(self, knowledge):
-        x, y = knowledge["current_pos"]
 
-        possible_actions = [{"type": "move", "target": (x, y + 1)},
-                            {"type": "move", "target": (x, y - 1)},
-                            {"type": "move", "target": (x + 1, y)},
-                            {"type": "move", "target": (x - 1, y)}
-                            ]
-
-        current_pos = knowledge["current_pos"]
-        inventory = knowledge["inventory"]
-
-        # Si déchet rouge + sur zone de dépôt -> put
-        if len(inventory[3]) == 1 and knowledge["grid"][current_pos]["drop"] and knowledge["grid"][current_pos]["zone"] == 3:
-            return {"type": "put"}
-
-        # Si déchet rouge + pas à l'extrémité droite -> move droite
-        if len(inventory[3]) == 1 and x < self.model.total_width - 1:
-            return {"type": "move", "target": (x + 1, y)}
-
-        # Si déchet rouge + à l'extrémité droite -> move haut ou bas
-        if len(inventory[3]) == 1 and x == self.model.total_width - 1:
-            return random.choice([
-                {"type": "move", "target": (x, y + 1)},
-                {"type": "move", "target": (x, y - 1)}
-            ])
-
-        # Si déchet rouge sur la case -> pick
-        if len(inventory[3]) == 0 and knowledge["grid"][current_pos]["wastes"][3] > 0:
-            return {"type": "pick"}
-
-        # Sinon -> move aléatoire
-        return random.choice(possible_actions)
+        if self.strategy == 'naive':
+            return naive_deliberate_red(knowledge=knowledge)
