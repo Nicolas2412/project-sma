@@ -16,7 +16,7 @@ import random
 
 class Robot(Agent):
     """ Robot Parent class """
-    def __init__(self, model, cooldown):
+    def __init__(self, model, cooldown=3):
         super().__init__(model)
         
         # Real inventory (Will be modified by model.do() when actions succeed)
