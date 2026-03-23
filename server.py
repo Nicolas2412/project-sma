@@ -46,7 +46,7 @@ model_params = {
         "value": 10,
         "label": "Height:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     "width_z1": {
@@ -54,7 +54,7 @@ model_params = {
         "value": 10,
         "label": "Width of zone 1:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     "width_z2": {
@@ -62,7 +62,7 @@ model_params = {
         "value": 10,
         "label": "Width of zone 2:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     "width_z3": {
@@ -70,7 +70,7 @@ model_params = {
         "value": 10,
         "label": "Width of zone 3:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     "n_green_agents": {
@@ -78,7 +78,7 @@ model_params = {
         "value": 10,
         "label": "Number of green agents:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     "n_yellow_agents": {
@@ -86,7 +86,7 @@ model_params = {
         "value": 10,
         "label": "Number of yellow agents:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     "n_red_agents": {
@@ -94,7 +94,7 @@ model_params = {
         "value": 10,
         "label": "Number of red agents:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     "n_green_wastes": {
@@ -102,7 +102,7 @@ model_params = {
         "value": 10,
         "label": "Number of green wastes:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     "n_yellow_wastes": {
@@ -110,7 +110,7 @@ model_params = {
         "value": 5,
         "label": "Number of yellow wastes:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     "n_red_wastes": {
@@ -118,7 +118,7 @@ model_params = {
         "value": 5,
         "label": "Number of red wastes:",
         "min": 1,
-        "max": 10,
+        "max": 100,
         "step": 1,
     },
     }
