@@ -25,6 +25,7 @@ class RobotModel(mesa.Model):
                 width_z1:int,
                 width_z2:int,
                 width_z3:int,
+                strategy:str,
                 seed = None):
         """Creates a new RobotModel
 
@@ -47,6 +48,8 @@ class RobotModel(mesa.Model):
         self.width_z3 = width_z3
         self.total_width = width_z1 + width_z2 + width_z3
 
+        self.strategy = strategy
+        
         self.grid = mesa.space.MultiGrid(self.total_width, height, False)
         
         for i in range(self.width_z1):
@@ -106,7 +109,7 @@ class RobotModel(mesa.Model):
             # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
-        green_agents = GreenAgent.create_agents(model=self, n=n_green_agents)
+        green_agents = GreenAgent.create_agents(model=self, n=n_green_agents, strategy=self.strategy)
         # Create x and y positions for agents
         x = self.rng.integers(0, self.width_z1, size=(n_green_agents,))
         y = self.rng.integers(0, self.grid.height, size=(n_green_agents,))
@@ -114,8 +117,7 @@ class RobotModel(mesa.Model):
             # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
-        yellow_agents = YellowAgent.create_agents(
-            model=self, n=n_yellow_agents)
+        yellow_agents = YellowAgent.create_agents(model=self, n=n_yellow_agents, strategy=self.strategy)
         # Create x and y positions for agents
         x = self.rng.integers(self.width_z1, self.width_z1 + self.width_z2, size=(n_yellow_agents,))
         y = self.rng.integers(0, self.grid.height, size=(n_yellow_agents,))
@@ -123,8 +125,7 @@ class RobotModel(mesa.Model):
             # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
-        red_agents = RedAgent.create_agents(
-            model=self, n=n_red_agents)
+        red_agents = RedAgent.create_agents(model=self, n=n_red_agents, strategy=self.strategy)
         # Create x and y positions for agents
         x = self.rng.integers(self.width_z1 + self.width_z2, self.width_z1 +
                             self.width_z2 + self.width_z3, size=(n_red_agents,))

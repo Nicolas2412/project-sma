@@ -41,6 +41,12 @@ def safe_get_model_vars_dataframe(self):
 DataCollector.get_model_vars_dataframe = safe_get_model_vars_dataframe
 
 model_params = {
+    "strategy": {
+        "type": "Select",
+        "value": "naive",
+        "values": ["naive", "random"],
+        "label": "Agents strategy:"
+    },
     "height": {
         "type": "SliderInt",
         "value": 10,
@@ -107,7 +113,7 @@ model_params = {
     },
     "n_yellow_wastes": {
         "type": "SliderInt",
-        "value": 5,
+        "value": 10,
         "label": "Number of yellow wastes:",
         "min": 1,
         "max": 100,
@@ -115,7 +121,7 @@ model_params = {
     },
     "n_red_wastes": {
         "type": "SliderInt",
-        "value": 5,
+        "value": 10,
         "label": "Number of red wastes:",
         "min": 1,
         "max": 100,
@@ -124,6 +130,7 @@ model_params = {
     }
 
 initial_params = {
+    "strategy":"naive",
     "n_green_agents": 10,
     "n_yellow_agents": 10,
     "n_red_agents": 10,

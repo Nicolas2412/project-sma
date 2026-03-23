@@ -14,6 +14,7 @@ import numpy as np
 from objects import Waste, Radioactivity
 import random
 from strategies.naive_strategy import naive_deliberate, naive_deliberate_red
+from strategies.random_strategy import random_deliberate
 
 class Robot(Agent):
     """ Robot Parent class """
@@ -83,6 +84,10 @@ class GreenAgent(Robot):
         
         if self.strategy == 'naive':
             return naive_deliberate(knowledge=knowledge, low_waste=1, high_waste=2, epsilon=self.epsilon)
+        elif self.strategy == 'random':
+            return random_deliberate()
+        else:
+            raise ValueError("Invalid strategy: " + self.strategy)
 
 
 class YellowAgent(Robot):
@@ -97,6 +102,11 @@ class YellowAgent(Robot):
 
         if self.strategy == 'naive':
             return naive_deliberate(knowledge=knowledge, low_waste=2, high_waste=3, epsilon=self.epsilon)
+        elif self.strategy == 'random':
+            return random_deliberate()
+        else:
+            raise ValueError("Invalid strategy: " + self.strategy)
+
     
 
 class RedAgent(Robot):
@@ -110,3 +120,7 @@ class RedAgent(Robot):
 
         if self.strategy == 'naive':
             return naive_deliberate_red(knowledge=knowledge)
+        elif self.strategy == 'random':
+            return random_deliberate(is_red=True)
+        else:
+            raise ValueError("Invalid strategy: " + self.strategy)
