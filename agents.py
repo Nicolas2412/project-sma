@@ -10,6 +10,7 @@
 ################################################################################
 
 from mesa import Agent
+import numpy as np
 from objects import Waste, Radioactivity
 import random
 
@@ -69,6 +70,7 @@ class GreenAgent(Robot):
     def __init__(self, model):
         super().__init__(model)
         self.type = 1
+        self.epsilon = 0.05
     
     def deliberate(self, knowledge):
         # "stay" acts as a fallback so random.choice() never crashes.
@@ -92,6 +94,7 @@ class GreenAgent(Robot):
         x,y = current_pos
         if len(inventory[2]) == 1 and self.knowledge["grid"][(x+1, y)]["zone"] == self.type+1:
             return {"type": "put"}
+        
 
         # # --- 2. PICK UP WASTE ---
         # # Look at the parsed data for our current coordinate
@@ -105,6 +108,10 @@ class GreenAgent(Robot):
             x, y = current_pos
             return {"type": "move", "target": (x + 1, y)}
         
+        # Drop if holding one low level item with a little probabilty
+        if len(inventory[1]) == 1 and self.model.rng.random() < self.epsilon:
+            return {"type":"put"}
+        
         return random.choice(possible_actions)
 
 
@@ -112,6 +119,7 @@ class YellowAgent(Robot):
     """Yellow robot class: Handles Yellow Waste -> Red Waste"""
     def __init__(self, model):
         super().__init__(model)
+        self.epsilon = 0.05
         self.type = 2
     
     def deliberate(self, knowledge):
@@ -146,6 +154,11 @@ class YellowAgent(Robot):
         if len(inventory[3]) == 1:
             x, y = current_pos
             return {"type": "move", "target": (x + 1, y)}
+        
+        # Drop if holding one low level item with a little probabilty
+        if len(inventory[2]) == 1 and self.model.rng.random() < self.epsilon:
+            return {"type": "put"}
+
 
         return random.choice(possible_actions)
     

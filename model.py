@@ -177,6 +177,7 @@ class RobotModel(mesa.Model):
         elif action_type == "put":
             if isinstance(agent, RedAgent):
                 if len(agent.wastes[agent.type]) == 1:
+                    #TODO: add a check to see if we are on the waste disposal zone
                     waste = agent.wastes[agent.type].pop()
                     waste.remove()
                     agent.wastes[agent.type] = []
@@ -185,6 +186,11 @@ class RobotModel(mesa.Model):
                 waste = agent.wastes[agent.type + 1].pop()
                 self.grid.place_agent(waste, agent.pos)
                 agent.wastes[agent.type + 1] = []
+                self._update_cache_at(agent.pos)
+            elif len(agent.wastes[agent.type]) == 1:
+                waste = agent.wastes[agent.type].pop()
+                self.grid.place_agent(waste, agent.pos)
+                agent.wastes[agent.type] = []
                 self._update_cache_at(agent.pos)
                 
         elif action_type == "transform":
@@ -235,20 +241,16 @@ class RobotModel(mesa.Model):
         self.agents.shuffle_do("step")
         self.datacollector.collect(self)
         
-        # Vérifie s'il reste des déchets sur la grille
-        waste_on_grid = any(
-            isinstance(a, Waste) and a.pos is not None
-            for a in self.agents
-        )
-
-
-        # Vérifie si un robot a assez de déchets pour continuer à travailler
-        agents_still_working = any(
-            (isinstance(a, GreenAgent) and (len(a.wastes[1]) == 2 or len(a.wastes[2]) == 1)) or
-            (isinstance(a, YellowAgent) and (len(a.wastes[2]) == 2 or len(a.wastes[3]) == 1)) or
-            (isinstance(a, RedAgent) and (len(a.wastes[3]) == 1))
-            for a in self.agents
+        green_count = sum(
+            1 for a in self.agents if isinstance(a, Waste) and a.color == 1
         )
         
-        if not waste_on_grid and not agents_still_working:
+        yellow_count = sum(
+            1 for a in self.agents if isinstance(a, Waste) and a.color == 2
+        )
+
+        red_count = sum(
+            1 for a in self.agents if isinstance(a, Waste) and a.color == 3
+        )
+        if green_count < 2 and yellow_count < 2 and red_count == 0:
             self.running = False
