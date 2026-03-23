@@ -16,7 +16,7 @@ import random
 
 class Robot(Agent):
     """ Robot Parent class """
-    def __init__(self, model):
+    def __init__(self, model, cooldown):
         super().__init__(model)
         
         # Real inventory (Will be modified by model.do() when actions succeed)
@@ -26,8 +26,11 @@ class Robot(Agent):
         self.knowledge = {
             "current_pos": None,
             "inventory": self.wastes.copy(),
-            "grid": {}
+            "grid": {},
+            "cooldown_remaining": 0
         }
+        self.cooldown = cooldown
+        self.cooldown_remaining = 0
         
         self.current_percepts = None
 
@@ -58,6 +61,7 @@ class Robot(Agent):
         self.knowledge["inventory"] = self.wastes.copy()
         
         self.knowledge["grid"].update(percepts["grid"])
+        self.knowledge["cooldown_remaining"] = percepts["cooldown_remaining"]
         
 
     def deliberate(self, knowledge):
@@ -99,7 +103,7 @@ class GreenAgent(Robot):
         # # --- 2. PICK UP WASTE ---
         # # Look at the parsed data for our current coordinate
         if len(inventory[1]) < 2 and len(inventory[2]) == 0 and \
-            knowledge['grid'][current_pos]['wastes'][1] > 0:
+            knowledge['grid'][current_pos]['wastes'][1] > 0 and knowledge["cooldown_remaining"] == 0:
             return {"type": "pick"}
         
         # # --- 3. MOVEMENT ---
@@ -146,7 +150,7 @@ class YellowAgent(Robot):
         # # --- 2. PICK UP WASTE ---
         # # Look at the parsed data for our current coordinate
         if len(inventory[2]) < 2 and len(inventory[3]) == 0 and \
-                knowledge['grid'][current_pos]['wastes'][2] > 0:
+                knowledge['grid'][current_pos]['wastes'][2] > 0 and knowledge["cooldown_remaining"] == 0:
             return {"type": "pick"}
 
         # # --- 3. MOVEMENT ---
@@ -158,7 +162,6 @@ class YellowAgent(Robot):
         # Drop if holding one low level item with a little probabilty
         if len(inventory[2]) == 1 and self.model.rng.random() < self.epsilon:
             return {"type": "put"}
-
 
         return random.choice(possible_actions)
     
