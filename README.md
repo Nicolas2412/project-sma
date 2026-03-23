@@ -16,7 +16,7 @@ Il simule un environnement divisé en trois zones de radioactivité croissante o
 Assurez-vous d'avoir Python installé sur votre machine. Utiliser le fichier `requirements.txt` pour installer l'ensemble des libraires nécessaires au bon fonctionnement du projet.
 
 ```bash
-pip install -r requirements.py
+pip install -r requirements.txt
 ```
 
 ## Instructions d'exécution
