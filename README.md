@@ -86,3 +86,6 @@ Pour gérer ce problème, il faudrait rajouter une petite chance de `put` l'obje
 
 **Pistes à explorer :**
 - *Stratégie naive:* Stratégie purement aléatoire, à part le fait que lorsqu'un robot est sur un waste qu'il peut récupérer il le récupère, lorsqu'un robot vert ou jaune a transformé un waste au niveau supérieur il va jusqu'à la frontière et le drop, et lorsqu'un rouge récupère 
+- *Stratégie sans comm:* Regarde les knowledge passés et trouve le waste le plus proche et va le chercher.
+- *Stratégie communication 1 à 1:* Quand deux agents du même type ont un waste, ils se retrouvent pour se passer le waste et transform
+- *Stratégie communication ultime:* Les agents sont au courant de tout ce que les autres agent savent et optimisent le fait de se retrouver pour transform ou d'aller chercher les wastes les plus proches.
