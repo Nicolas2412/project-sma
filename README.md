@@ -63,6 +63,8 @@ En checkant bien dans cet ordre les actions possibles, cela globalement de deman
 
 4. **Action (`do`)** : L'environnement résout l'action demandée par l'agent si elle est possible, applique les conséquences physiques (ex: retrait d'un objet de la grille) et renvoie les nouvelles perceptions.
 
+### 4. Script de comparaison des stratégies
+Le fichier `compare_strategies.py` permet d'éxecuter un certain nombre de run complet avec les différentes stratégies souhaités et de mesurer des statistiques permettant de comparer l'efficacité de ces stratégeis. Le critère principal d'efficacité que nous utilisons et le nombre de steps nécessaire pour terminer le ramassage.
 
 ## État d'avancement et Résultats
 
@@ -81,8 +83,11 @@ En checkant bien dans cet ordre les actions possibles, cela globalement de deman
 Grâce au dashboard dynamique, on observe bien la courbe de déchets verts et jaunes diminuer au profit de déchets de niveaux supérieurs, jusqu'à l'évacuation complète par les agents rouges. L'architecture développée prévient les erreurs de collisions ou de triche : un agent ne se déplace ou ne ramasse un objet que si l'environnement valide la faisabilité de son intention.
 
 Certains déchets vert et jaune ne disparaissent pas dans certains cas, car ils sont bloqués dans les inventaires des robots sans pouvoir être transformés car plus aucun déchet du même type n'est au sol.
-Pour gérer ce problème, il faudrait rajouter une petite chance de `put` l'objet transporté au lieu de se déplacer lorsqu'un agent possède un seul objet de son type. Il faudrait alors adapter la condition de fin d'épisode également
+Pour gérer ce problème, nous rajoutons une  petite chance de `put` l'objet transporté au lieu de se déplacer lorsqu'un agent possède un seul objet de son type. Nous avons adapté la condition de terminaison en conséquence, afin que le ramassage soit considéré terminé uniquemenet si il reste strictement moins de 2 déchets vert, strictement moins de 2 déchets jaune, et aucun déchets rouge.
 
+Le script de comparaison, sur 10 épisodes, avec 10 agents et 10 déchets de chaque type, et les trois zones de taille 10x10, fournit les résultats suivant en comparant la stratégie `random` et la stratégie `naive`, en limitant le nombre de steps à 20 000.
+
+![Courbes du temps pour terminer le ramassage (random vs naive)](results/compare_random_naive.png)
 
 **Pistes à explorer :**
 - *Stratégie naive:* Stratégie purement aléatoire, à part le fait que lorsqu'un robot est sur un waste qu'il peut récupérer il le récupère, lorsqu'un robot vert ou jaune a transformé un waste au niveau supérieur il va jusqu'à la frontière et le drop, et lorsqu'un rouge récupère 
