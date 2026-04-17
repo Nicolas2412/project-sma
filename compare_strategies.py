@@ -204,7 +204,7 @@ def plot_results(results: dict):
     ax2.set_ylim(bottom=0)
 
     plt.tight_layout()
-    plt.savefig("results/comparison_results.png", dpi=150, bbox_inches="tight")
+    plt.savefig("images/results/comparison_results.png", dpi=150, bbox_inches="tight")
     print("\nGraphique sauvegardé : comparison_results.png")
     plt.show()
 

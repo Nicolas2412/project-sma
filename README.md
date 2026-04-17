@@ -28,6 +28,8 @@ solara run server.py
 ```
 Une fois la commande lancée, un lien local (généralement `http://localhost:8765`) s'affichera dans votre terminal. Ouvrez ce lien dans votre navigateur web pour interagir avec la simulation.
 
+![Interface Solara](images/other/solara_app.png)
+
 ##  Choix Conceptuels et Architecture
 
 ### 1. L'Environnement
@@ -89,7 +91,7 @@ Certains déchets verts et jaunes peuvent rester bloqués dans les inventaires d
 ### Comparaison : Scénario à forte densité (10 agents par type)
 Nous avons comparé nos stratégies sur 10 épisodes, avec 10 agents et 10 déchets de chaque type, et un nombre de steps limité à 20 000 :
 
-![Courbes 10 agents](results/compare_smart_10all.png)
+![Courbes 10 agents](images/results/compare_smart_10all.png)
 
 Toutes nos stratégies surpassent largement l'aléatoire. Cependant, un résultat contre-intuitif émerge : la stratégie **naïve** (~639 steps) domine largement la stratégie **intelligente** (~4485 steps). 
 
@@ -99,7 +101,7 @@ Dans un espace restreint avec beaucoup d'agents, si un déchet est repéré, plu
 ### Comparaison : Scénario à faible densité (1 agent par type)
 Pour confirmer cette intuition, nous avons relancé l'expérience avec un seul agent de chaque couleur :
 
-![Courbes 1 agent](results/compare_smart_1Agent.png)
+![Courbes 1 agent](images/results/compare_smart_1Agent.png)
 
 Cette fois-ci, l'absence de compétition annule le problème des "fantômes". La mémoire devient 100% fiable. On observe que la stratégie **intelligente** (~1478 steps) converge beaucoup plus efficacement et de manière beaucoup plus stable que la stratégie **naïve** (~4958 steps).
 
