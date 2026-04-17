@@ -20,13 +20,13 @@ from objects import Waste
 # CONFIGURATION
 
 # Stratégies à comparer
-STRATEGIES = ["random", "naive"]
+STRATEGIES = ["random", "naive", "smart"]
 
 # Paramètres fixes identiques pour tous les runs
 FIXED_PARAMS = {
-    "n_green_agents":  10,
-    "n_yellow_agents": 10,
-    "n_red_agents":    10,
+    "n_green_agents":  1,
+    "n_yellow_agents": 1,
+    "n_red_agents":    1,
     "n_green_wastes":  10,
     "n_yellow_wastes": 10,
     "n_red_wastes":    10,
@@ -204,7 +204,7 @@ def plot_results(results: dict):
     ax2.set_ylim(bottom=0)
 
     plt.tight_layout()
-    plt.savefig("results/comparison_results.png", dpi=150, bbox_inches="tight")
+    plt.savefig("images/results/comparison_results.png", dpi=150, bbox_inches="tight")
     print("\nGraphique sauvegardé : comparison_results.png")
     plt.show()
 

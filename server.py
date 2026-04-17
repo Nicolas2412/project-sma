@@ -44,7 +44,7 @@ model_params = {
     "strategy": {
         "type": "Select",
         "value": "naive",
-        "values": ["naive", "random"],
+        "values": ["naive", "random", "smart"],
         "label": "Agents strategy:"
     },
     "height": {
