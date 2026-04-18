@@ -20,7 +20,7 @@ from objects import Waste
 # CONFIGURATION
 
 # Stratégies à comparer
-STRATEGIES = ["random", "naive", "smart"]
+STRATEGIES = ["random", "naive", "smart", "communicating"]
 
 # Paramètres fixes identiques pour tous les runs
 FIXED_PARAMS = {

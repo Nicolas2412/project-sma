@@ -1,8 +1,6 @@
 ################################################################################
 # PROJET : SMA (Systèmes Multi-Agents) - Groupe 6
 #
-# FILE: strategies/smart_strategy.py
-#
 # Stratégie "smart" : exploration progressive + pathfinding BFS sur la carte
 # connue. Sans communication entre agents.
 #

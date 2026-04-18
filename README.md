@@ -63,7 +63,7 @@ Notre première stratégie : Les actions sont choisies selon des règles fixes, 
 Pour les agents verts et jaune:
 - Si un agent possède deux déchets de sont types, il `transform`
 - Sinon, s'il possède un déchets de type supérieur à lui et que la case à sa droite est de niveau supérieur, il `put`
-- Sinon, s'il , s'il possède un déchets de type supérieur à lui, il `move` il move vers la droite.
+- Sinon, s'il possède un déchets de type supérieur à lui, il `move` il move vers la droite.
 - Sinon, s'il est sur un déchet de son niveau, il `pick`.
 - Sinon, il `move` dans une des qatres directions de manière aléatoire (uniformement).
 Après nos premiers essais, nous avons dû rajouter une faible probabilité de lâcher le déchet pour les agents vert et jaune, afin de ne pas se retrouver dans des deadlocks où chaque agent possède un déchet dans son inventaire. 
@@ -81,7 +81,17 @@ En vérifiant bien dans cet ordre les actions possibles, cela évite globalement
 Cette stratégie ajoute une file d'actions à l'agent. Lorsqu'il est en situation de recherche d'un déchet, s'il a dans sa connaissance la position d'un déchet, il va se déplacer afin de le rejoindre le plus rapidement possible (BFS). Si sur son chemin il passe directement ou juste à coté d'un autre déchet, il change de target pour récupérer ce déchet (qui est plus proche et pour lequel il est sur qu'il est encore présent).
 
 ### Stratégie communication
+Cette stratégie étend la stratégie intelligente en dotant les agents de la capacité à **s'échanger un déchet** directement, via un protocole de rendez-vous en quatre messages.
 
+**Objectif :** résoudre le blocage symétrique où deux agents du même type possèdent chacun un seul déchet. Dans cette situation, aucun des deux ne peut transformer sans en ramasser un deuxième, et la seule issue sans communication est l'abandon aléatoire. Avec communication, l'un des deux agents apporte son déchet à l'autre, qui peut alors transformer immédiatement.
+
+**Protocole PROPOSE → ACCEPT → COMMIT → CANCEL :**
+1. Tout agent portant exactement un déchet de sa couleur et n'étant engagé dans aucun rendez-vous diffuse un message `PROPOSE` à tous les agents du même type, en indiquant sa position.
+2. Un agent libre portant lui aussi exactement un déchet répond `ACCEPT` en indiquant sa propre position. Il prend le rôle d'**accepteur** et attend sur place.
+3. Le demandeur prend le premier `ACCEPT` reçu, confirme par `COMMIT`, et prend le rôle de **demandeur**. Les `ACCEPT` tardifs reçoivent un `CANCEL`.
+4. Le demandeur navigue via BFS vers la position de l'accepteur et y dépose son déchet (`put`). L'accepteur, resté sur place, ramasse le déchet dès qu'il apparaît sur sa case, puis transforme.
+
+Un compteur de steps est associé à chaque rendez-vous actif. Si le délai dépasse un seuil (`RENDEZVOUS_TIMEOUT = 40` steps), le rendez-vous est annulé et un `CANCEL` est envoyé au partenaire, évitant tout gel permanent d'un agent. Ce mécanisme de timeout garantit que la stratégie de communication dégrade gracieusement vers la stratégie intelligente en cas d'échec de coordination.
 
 ## Résultats
 Grâce au dashboard dynamique, on observe bien la courbe de déchets verts et jaunes diminuer au profit de déchets de niveaux supérieurs, jusqu'à l'évacuation complète par les agents rouges. L'architecture développée prévient les erreurs de collisions ou de triche : un agent ne se déplace ou ne ramasse un objet que si l'environnement valide la faisabilité de son intention.
@@ -105,17 +115,26 @@ Pour confirmer cette intuition, nous avons relancé l'expérience avec un seul a
 
 Cette fois-ci, l'absence de compétition annule le problème des "fantômes". La mémoire devient 100% fiable. On observe que la stratégie **intelligente** (~1478 steps) converge beaucoup plus efficacement et de manière beaucoup plus stable que la stratégie **naïve** (~4958 steps).
 
+### Comparaison : Toutes les stratégies (10 agents par type)
+Nous avons finalement comparé l'ensemble des quatre stratégies dans le même scénario à forte densité (10 agents et 10 déchets de chaque type, 10 runs, maximum 20 000 steps):
+
+![Courbes toutes stratégies](images/results/comparison_communicating_all.png)
+
+Les résultats confirment la progression attendue en haut du classement: la stratégie **communicating** (~1130 steps) et la stratégie **smart** (~1166 steps) sont pratiquement à égalité, toutes deux très largement devant **naive** (~4431 steps) et **random** (médiane à la limite des 20 000 steps, sans jamais terminer).
+
+**Analyse : Un gain modeste mais cohérent de la communication.**
+L'écart entre smart et communicating est faible (~3%), ce qui s'explique bien dans ce scénario à forte densité : avec 10 agents par zone, la probabilité qu'un agent trouve naturellement un deuxième déchet au sol reste élevée, rendant le mécanisme de rendez-vous moins nécessaire. 
+
+On aurait cependant pu espérer obtenir un meilleur résultat car c'est souvent le fait que quelques agents aient un déchet et qu'il n'y en a plus disponible qui fait que ça prend du temps avant de converger. Nous pensons que ce qui empeche la stratégie d'être réellement éfficace est le fait que les rendez-vous ne se font pas toujours car les agents sont trop loins ou ne connaissent pas le chemin pour se retrouver, et surtout que d'autres agents viennent ramasser le déchet entre temps et que le bon agent ne le récupère pas.
+
+Une amélioration possible aurait donc pu être d'interdire aux autres agents de récupérer le déchet.
+
 **Fonctionnalités achevées :**
 - **Génération procédurale** de la carte avec répartition automatique des trois zones de radioactivité et de la zone de dépôt.
-- **Architecture de délibération modulaire** permettant de basculer facilement entre nos différentes stratégies (`random`, `naïve`, `smart`).
+- **Architecture de délibération modulaire** permettant de basculer facilement entre nos différentes stratégies (`random`, `naïve`, `smart`, `communicating`).
 - **Mécaniques physiques opérationnelles** : ramassage, transformation dans l'inventaire (fusion de déchets de même niveau) et dépôt à la frontière de la zone suivante.
 - **Interface visuelle interactive** avec `Solara` et `Mesa` :
   - Dashboard de contrôle (sliders) pour paramétrer la taille des zones, le nombre d'agents et la quantité de déchets initiaux.
   - Rendu en temps réel de la grille spatiale et du comportement des agents.
   - Collecte de données (`DataCollector`) et affichage de graphiques dynamiques suivant la quantité de déchets restants.
-- **Résolution des interblocages (deadlocks)** : ajout d'une probabilité d'abandon stochastique (`epsilon`) pour les agents bloqués avec un seul objet, et mise à jour dynamique des conditions de fin de simulation.
-
-### Pistes à explorer :
-L'implémentation de la stratégie "smart" a mis en évidence les limites d'une mémoire individuelle sans partage d'informations. Nos prochaines étapes se concentrent sur la communication :
-- *Stratégie de communication Pair-à-Pair (1 à 1) :* Permettre à deux agents du même type se croisant d'échanger des informations (ex: se donner un déchet pour forcer une transformation).
-- *Stratégie de communication globale (Blackboard) :* Mettre en place un système où les agents partagent une base de connaissances commune (si un agent ramasse un déchet, il disparaît de la mémoire de tous les autres), ce qui devrait supprimer totalement le phénomène de "chasse aux fantômes" observé.
+- **Résolution des interblocages (deadlocks)** : ajout d'une probabilité d'abandon stochastique (`epsilon`) pour les agents bloqués avec un seul objet, protocole de rendez-vous avec timeout pour la stratégie communicating, et mise à jour dynamique des conditions de fin de simulation.

@@ -1,135 +1,313 @@
-################################################################################
-# PROJET : SMA (Systèmes Multi-Agents) - Groupe 6
-# DATE DE CRÉATION : 16/03/2026
-#
-# MEMBRES DU GROUPE :
-#   - Nicolas Charronnière
-#   - Paul Guimbert
-#
-# FILE: agents.py
-################################################################################
-
-from mesa import Agent
-import numpy as np
-from objects import Waste, Radioactivity
 import random
+from objects import Waste, Radioactivity
+from communication.agent.CommunicatingAgent import CommunicatingAgent
+from communication.message.Message import Message
+from communication.message.MessagePerformative import MessagePerformative
 from strategies.naive_strategy import naive_deliberate, naive_deliberate_red
 from strategies.random_strategy import random_deliberate
 from strategies.smart_strategy import smart_deliberate, smart_deliberate_red, update_known_wastes
+from strategies.communication_strategy import comm_deliberate
 
-class Robot(Agent):
-    """ Robot Parent class """
-    def __init__(self, model, cooldown=3):
-        super().__init__(model)
-        
-        # Real inventory (Will be modified by model.do() when actions succeed)
+# ──────────────────────────────────────────────────────────────────────────────
+# Base Robot — always inherits CommunicatingAgent
+# ──────────────────────────────────────────────────────────────────────────────
+
+class Robot(CommunicatingAgent):
+    """Robot parent class. Inherits CommunicatingAgent so all robots have
+    a name and mailbox regardless of strategy. Non-communicating strategies
+    simply never send or read messages."""
+
+    def __init__(self, model, name: str, cooldown: int = 3):
+        super().__init__(model, name)
+
         self.wastes = {1: [], 2: [], 3: []}
-        
-        # Strictly structured knowledge base
+
         self.knowledge = {
-            "current_pos": None,
-            "inventory": self.wastes.copy(),
-            "grid": {},
+            "current_pos":        None,
+            "inventory":          self.wastes.copy(),
+            "grid":               {},
             "cooldown_remaining": 0,
-            "known_wastes": {},
-            "action_queue": [],
-            "target": None,
+            "known_wastes":       {},   
+            "action_queue":       [],   
+            "target":             None, 
+            "rendezvous":         None, 
         }
-        
+
         self.cooldown = cooldown
         self.cooldown_remaining = 0
         self.current_percepts = None
 
     def step(self):
-        # If it's the very first step, we need initial percepts from the model
         if not self.current_percepts:
             self.current_percepts = self.model.get_percepts(self)
-
-        # Update knowledge based on new percepts and current real inventory
         self.update(self.current_percepts)
-        # Deliberate to choose an action (pass ONLY knowledge)
+        self._process_messages()          
         action = self.deliberate(self.knowledge)
-        
-        # Do action in environment, environment returns new percepts
-        # percepts format: {"current_pos": (x, y), "adjency_grid": {(x, y): [agents]}}
         self.current_percepts = self.model.do(self, action)
-        
+
     def update(self, percepts):
-        """
-        Updates the agent's knowledge base using the percepts dictionary.
-        Parses raw agents into pure data for the reasoning engine.
-        Handles int-to-string mapping for Waste colors (1: green, 2: yellow, 3: red).
-        """
-        # 1. Update Position directly from percepts
-        self.knowledge["current_pos"] = percepts["current_pos"]
-        
-        # 2. Sync the knowledge inventory with the real physical inventory 
-        self.knowledge["inventory"] = self.wastes.copy()
-        
+        self.knowledge["current_pos"]        = percepts["current_pos"]
+        self.knowledge["inventory"]          = self.wastes.copy()
         self.knowledge["grid"].update(percepts["grid"])
-        self.knowledge["cooldown_remaining"] = percepts["cooldown_remaining"]
-        update_known_wastes(self.knowledge, percepts)
+        self.knowledge["cooldown_remaining"] = percepts.get("cooldown_remaining", 0)
+        update_known_wastes(self.knowledge, percepts)  
 
-    def deliberate(self, knowledge):
-        """To be overridden by child classes. MUST NOT use 'self.xxx' variables."""
+    def _process_messages(self):
+        """No-op by default. Overridden by _RendezvousMixin."""
         pass
-    
 
-class GreenAgent(Robot):
-    """Green robot class: Handles Green Waste -> Yellow Waste"""
-    def __init__(self, model, strategy:str='naive'):
-        super().__init__(model)
-        self.type = 1
-        self.epsilon = 0.05
-        self.strategy = strategy
-        
     def deliberate(self, knowledge):
-        
-        if self.strategy == 'naive':
-            return naive_deliberate(knowledge=knowledge, low_waste=1, high_waste=2, epsilon=self.epsilon)
-        elif self.strategy == 'random':
-            return random_deliberate(knowledge=knowledge)
-        elif self.strategy == 'smart':
-            return smart_deliberate(knowledge=knowledge, low_waste=1, high_waste=2, epsilon=self.epsilon)
-        else:
-            raise ValueError("Invalid strategy: " + self.strategy)
+        pass
 
 
-class YellowAgent(Robot):
-    """Yellow robot class: Handles Yellow Waste -> Red Waste"""
-    def __init__(self, model, strategy:str='naive'):
-        super().__init__(model)
-        self.epsilon = 0.05
-        self.type = 2
+# ──────────────────────────────────────────────────────────────────────────────
+# Rendezvous mixin
+# ──────────────────────────────────────────────────────────────────────────────
+
+RENDEZVOUS_TIMEOUT = 40
+
+class _RendezvousMixin:
+    """Shared communication logic for GreenAgent / YellowAgent
+    when strategy == 'communicating'.
+
+    Protocol (PROPOSE → ACCEPT → COMMIT):
+      • Any agent holding exactly 1 own-colour waste broadcasts PROPOSE.
+      • A recipient that also holds exactly 1 own-colour waste and is free
+        replies ACCEPT (no BFS check — routing is handled by comm_deliberate).
+      • The requester takes the first ACCEPT, sets partner + target_pos,
+        and confirms with COMMIT. Late ACCEPTs get CANCEL.
+      • The requester navigates to the acceptor and drops its waste there.
+      • The acceptor picks up the dropped waste and transforms.
+      • A step counter guards against permanent freezes (RENDEZVOUS_TIMEOUT).
+    """
+
+    def _process_messages(self):
+        rendezvous = self.knowledge["rendezvous"]
+        my_name    = self.get_name()
+        my_pos     = self.knowledge["current_pos"]
+        inventory  = self.knowledge["inventory"]
+        own_waste  = self.type
+
+        if rendezvous is not None:
+            rendezvous["steps_waiting"] = rendezvous.get("steps_waiting", 0) + 1
+            if rendezvous["steps_waiting"] > RENDEZVOUS_TIMEOUT:
+                print(f"[{my_name}] TIMEOUT — cancelling rendezvous "
+                      f"(role={rendezvous['role']}, partner={rendezvous['partner']})")
+                if rendezvous["partner"] is not None:
+                    self.send_message(Message(
+                        my_name, rendezvous["partner"],
+                        MessagePerformative.CANCEL, {}
+                    ))
+                self.knowledge["rendezvous"] = None
+                rendezvous = None
+
+        if (rendezvous is not None and
+                rendezvous["role"] == "requester" and
+                rendezvous["target_pos"] is None):
+            if len(inventory[own_waste]) != 1 or len(inventory[own_waste + 1]) != 0:
+                print(f"[{my_name}] cancelling PROPOSE — inventory changed "
+                      f"before any ACCEPT (inv={inventory})")
+                if rendezvous["partner"] is not None:
+                    self.send_message(Message(
+                        my_name, rendezvous["partner"],
+                        MessagePerformative.CANCEL, {}
+                    ))
+                self.knowledge["rendezvous"] = None
+                rendezvous = None
+
+        for msg in self.get_new_messages():
+            perf    = msg.get_performative()
+            sender  = msg.get_exp()
+            content = msg.get_content()
+            rendezvous = self.knowledge["rendezvous"]
+
+            if perf == MessagePerformative.PROPOSE:
+                if (rendezvous is None and
+                        len(inventory[own_waste]) == 1 and
+                        len(inventory[own_waste + 1]) == 0 and
+                        sender != my_name):
+                    rendezvous = {
+                        "role":          "acceptor",
+                        "partner":       sender,
+                        "target_pos":    content["pos"], 
+                        "steps_waiting": 0,
+                    }
+                    self.knowledge["rendezvous"] = rendezvous
+                    self.send_message(Message(
+                        my_name, sender,
+                        MessagePerformative.ACCEPT, {"pos": my_pos}
+                    ))
+                    print(f"[{my_name}] ACCEPT → {sender} "
+                          f"(my_pos={my_pos}, requester_pos={content['pos']})")
+
+            elif perf == MessagePerformative.ACCEPT:
+                if (rendezvous is not None and
+                        rendezvous["role"] == "requester" and
+                        rendezvous["partner"] is None):
+                    rendezvous["partner"]    = sender
+                    rendezvous["target_pos"] = content["pos"]
+                    self.knowledge["rendezvous"] = rendezvous
+                    self.send_message(Message(
+                        my_name, sender,
+                        MessagePerformative.COMMIT, {"pos": my_pos}
+                    ))
+                    print(f"[{my_name}] COMMIT → {sender} "
+                          f"(heading to {content['pos']})")
+
+                elif (rendezvous is not None and
+                        rendezvous["role"] == "requester" and
+                        rendezvous["partner"] != sender):
+                    # Late ACCEPT — already have a partner.
+                    self.send_message(Message(
+                        my_name, sender,
+                        MessagePerformative.CANCEL, {}
+                    ))
+
+            elif perf == MessagePerformative.COMMIT:
+                pass
+
+            elif perf == MessagePerformative.CANCEL:
+                if rendezvous is not None and rendezvous["partner"] == sender:
+                    print(f"[{my_name}] rendezvous CANCELLED by {sender}")
+                    self.knowledge["rendezvous"] = None
+
+    def _maybe_initiate_rendezvous(self, knowledge):
+        """Broadcast PROPOSE to all same-type agents if we hold exactly
+        1 own-colour waste and are not already in a rendezvous."""
+        own_waste  = self.type
+        inventory  = knowledge["inventory"]
+        rendezvous = knowledge["rendezvous"]
+        my_name    = self.get_name()
+        my_pos     = knowledge["current_pos"]
+
+        if rendezvous is not None:
+            return
+        if len(inventory[own_waste]) != 1 or len(inventory[own_waste + 1]) != 0:
+            return
+
+        target_class = type(self)
+        sent = False
+        for agent in self.model.agents:
+            if isinstance(agent, target_class) and agent.get_name() != my_name:
+                self.send_message(Message(
+                    my_name, agent.get_name(),
+                    MessagePerformative.PROPOSE, {"pos": my_pos}
+                ))
+                sent = True
+
+        if sent:
+            self.knowledge["rendezvous"] = {
+                "role":          "requester",
+                "partner":       None,
+                "target_pos":    None,
+                "steps_waiting": 0,
+            }
+            print(f"[{my_name}] PROPOSE broadcast (pos={my_pos}, "
+                  f"inv={len(inventory[own_waste])} waste-{own_waste})")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GreenAgent
+# ──────────────────────────────────────────────────────────────────────────────
+
+class GreenAgent(_RendezvousMixin, Robot):
+
+    def __init__(self, model, strategy: str = 'naive'):
+        name = f"GreenAgent_{GreenAgent._next_id(model)}"
+        super().__init__(model, name=name)
+        self.type     = 1
+        self.epsilon  = 0.05
         self.strategy = strategy
-    
+
+    @staticmethod
+    def _next_id(model):
+        if not hasattr(model, "_green_agent_counter"):
+            model._green_agent_counter = 0
+        model._green_agent_counter += 1
+        return model._green_agent_counter
+
+    def _process_messages(self):
+        if self.strategy == 'communicating':
+            _RendezvousMixin._process_messages(self)
+        # else: no-op
+
     def deliberate(self, knowledge):
-
         if self.strategy == 'naive':
-            return naive_deliberate(knowledge=knowledge, low_waste=2, high_waste=3, epsilon=self.epsilon)
+            return naive_deliberate(knowledge, low_waste=1, high_waste=2, epsilon=self.epsilon)
         elif self.strategy == 'random':
-            return random_deliberate(knowledge=knowledge)
+            return random_deliberate(knowledge)
         elif self.strategy == 'smart':
-            return smart_deliberate(knowledge=knowledge, low_waste=2, high_waste=3, epsilon=self.epsilon)
+            return smart_deliberate(knowledge, low_waste=1, high_waste=2, epsilon=self.epsilon)
+        elif self.strategy == 'communicating':
+            self._maybe_initiate_rendezvous(knowledge)
+            return comm_deliberate(knowledge, low_waste=1, high_waste=2, epsilon=self.epsilon)
         else:
-            raise ValueError("Invalid strategy: " + self.strategy)
+            raise ValueError(f"Invalid strategy: {self.strategy}")
 
-    
+
+# ──────────────────────────────────────────────────────────────────────────────
+# YellowAgent
+# ──────────────────────────────────────────────────────────────────────────────
+
+class YellowAgent(_RendezvousMixin, Robot):
+
+    def __init__(self, model, strategy: str = 'naive'):
+        name = f"YellowAgent_{YellowAgent._next_id(model)}"
+        super().__init__(model, name=name)
+        self.type     = 2
+        self.epsilon  = 0.05
+        self.strategy = strategy
+
+    @staticmethod
+    def _next_id(model):
+        if not hasattr(model, "_yellow_agent_counter"):
+            model._yellow_agent_counter = 0
+        model._yellow_agent_counter += 1
+        return model._yellow_agent_counter
+
+    def _process_messages(self):
+        if self.strategy == 'communicating':
+            _RendezvousMixin._process_messages(self)
+
+    def deliberate(self, knowledge):
+        if self.strategy == 'naive':
+            return naive_deliberate(knowledge, low_waste=2, high_waste=3, epsilon=self.epsilon)
+        elif self.strategy == 'random':
+            return random_deliberate(knowledge)
+        elif self.strategy == 'smart':
+            return smart_deliberate(knowledge, low_waste=2, high_waste=3, epsilon=self.epsilon)
+        elif self.strategy == 'communicating':
+            self._maybe_initiate_rendezvous(knowledge)
+            return comm_deliberate(knowledge, low_waste=2, high_waste=3, epsilon=self.epsilon)
+        else:
+            raise ValueError(f"Invalid strategy: {self.strategy}")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# RedAgent
+# ──────────────────────────────────────────────────────────────────────────────
 
 class RedAgent(Robot):
-    """Red robot class: Handles Red Waste -> Disposal Zone"""
-    def __init__(self, model, strategy:str='naive'):
-        super().__init__(model)
-        self.type = 3
-        self.strategy = strategy
-        
-    def deliberate(self, knowledge):
 
+    def __init__(self, model, strategy: str = 'naive'):
+        name = f"RedAgent_{RedAgent._next_id(model)}"
+        super().__init__(model, name=name)
+        self.type     = 3
+        self.strategy = strategy
+
+    @staticmethod
+    def _next_id(model):
+        if not hasattr(model, "_red_agent_counter"):
+            model._red_agent_counter = 0
+        model._red_agent_counter += 1
+        return model._red_agent_counter
+
+    def deliberate(self, knowledge):
         if self.strategy == 'naive':
-            return naive_deliberate_red(knowledge=knowledge)
+            return naive_deliberate_red(knowledge)
         elif self.strategy == 'random':
-            return random_deliberate(knowledge=knowledge, is_red=True)
-        elif self.strategy == 'smart':
-            return smart_deliberate_red(knowledge=knowledge)
+            return random_deliberate(knowledge, is_red=True)
+        elif self.strategy in ('smart', 'communicating'):
+            return smart_deliberate_red(knowledge)
         else:
-            raise ValueError("Invalid strategy: " + self.strategy)
+            raise ValueError(f"Invalid strategy: {self.strategy}")

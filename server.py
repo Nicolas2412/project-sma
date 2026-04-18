@@ -1,14 +1,3 @@
-################################################################################
-# PROJET : SMA (Systees Multi-Agents) - Groupe 6
-# DATE DE CRÉATION : 16/03/2026
-#
-# MEMBRES DU GROUPE :
-#   - Nicolas Charronidere
-#   - Paul Guimbert
-#
-# FILE: server.py
-################################################################################
-
 from matplotlib.figure import Figure
 import numpy as np
 import matplotlib.colors as mcolors
@@ -44,7 +33,7 @@ model_params = {
     "strategy": {
         "type": "Select",
         "value": "naive",
-        "values": ["naive", "random", "smart"],
+        "values": ["naive", "random", "smart", "communicating"],
         "label": "Agents strategy:"
     },
     "height": {
