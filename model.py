@@ -12,6 +12,7 @@
 import mesa
 from agents import *
 from objects import *
+from communication.message.MessageService import MessageService
 
 class RobotModel(mesa.Model):
     def __init__(self,
