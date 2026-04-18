@@ -1,12 +1,5 @@
 ################################################################################
 # PROJET : SMA (Systèmes Multi-Agents) - Groupe 6
-# DATE DE CRÉATION : 16/04/2026
-#
-# MEMBRES DU GROUPE :
-#   - Nicolas Charronnière
-#   - Paul Guimbert
-#
-# FILE: strategies/communication_strategy.py
 #
 # Stratégie "communicating" : smart BFS + rendezvous protocol.
 # The rendezvous negotiation (PROPOSE/ACCEPT/COMMIT/CANCEL) is handled
@@ -59,8 +52,7 @@ def comm_deliberate(knowledge, low_waste: int, high_waste: int, epsilon: float):
     if len(inventory[low_waste]) == 2:
         knowledge["action_queue"] = []
         knowledge["target"] = None
-        # Rendezvous is complete once we have 2 wastes — clear it so we don't
-        # remain frozen as an acceptor after picking up the dropped waste.
+
         knowledge["rendezvous"] = None
         return {"type": "transform"}
 
@@ -80,24 +72,18 @@ def comm_deliberate(knowledge, low_waste: int, high_waste: int, epsilon: float):
 
         # ── ACCEPTOR ─────────────────────────────────────────────────────────
         if role == "acceptor":
-            # Priority 1: pick up waste that was just dropped on our cell.
-            # This MUST come before the no-op so the acceptor doesn't sit
-            # on top of the waste forever without picking it up.
             if (knowledge["cooldown_remaining"] == 0 and
                     known_grid.get(current_pos, {}).get("wastes", {}).get(low_waste, 0) > 0):
                 print(f"[acceptor at {current_pos}] picking up dropped waste")
                 return {"type": "pick"}
 
-            # Otherwise stay put — the requester is on its way.
-            return {"type": "move", "target": current_pos}  # no-op
+            return {"type": "move", "target": current_pos}  
 
         # ── REQUESTER ─────────────────────────────────────────────────────────
         if role == "requester":
             if target_pos is None:
-                # Still waiting for ACCEPT — keep exploring (don't pick).
                 return random.choice(possible_actions)
 
-            # Arrived at acceptor's cell → drop waste and end rendezvous.
             if current_pos == target_pos:
                 knowledge["rendezvous"] = None
                 knowledge["action_queue"] = []
@@ -105,17 +91,12 @@ def comm_deliberate(knowledge, low_waste: int, high_waste: int, epsilon: float):
                 print(f"[requester at {current_pos}] ARRIVED — dropping waste")
                 return {"type": "put"}
 
-            # Navigate toward acceptor via BFS.
-            # Re-plan whenever the queued target differs from target_pos
-            # (target_pos can update if acceptor moves) or the queue is empty.
             if not action_queue or knowledge.get("target") != target_pos:
                 path = _bfs(current_pos, target_pos, known_grid, max_zone)
                 if path:
                     knowledge["action_queue"] = _path_to_queue(path)
                     knowledge["target"] = target_pos
                 else:
-                    # Path not known yet — explore randomly until the grid
-                    # is filled in enough for BFS to find a route.
                     return random.choice(possible_actions)
 
             if action_queue:

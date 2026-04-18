@@ -1,14 +1,3 @@
-################################################################################
-# PROJET : SMA (Systèmes Multi-Agents) - Groupe 6
-# DATE DE CRÉATION : 16/03/2026
-#
-# MEMBRES DU GROUPE :
-#   - Nicolas Charronnière
-#   - Paul Guimbert
-#
-# FILE: agents.py
-################################################################################
-
 import random
 from objects import Waste, Radioactivity
 from communication.agent.CommunicatingAgent import CommunicatingAgent
@@ -38,10 +27,10 @@ class Robot(CommunicatingAgent):
             "inventory":          self.wastes.copy(),
             "grid":               {},
             "cooldown_remaining": 0,
-            "known_wastes":       {},   # used by smart + communicating
-            "action_queue":       [],   # used by smart + communicating
-            "target":             None, # used by smart + communicating
-            "rendezvous":         None, # used by communicating only
+            "known_wastes":       {},   
+            "action_queue":       [],   
+            "target":             None, 
+            "rendezvous":         None, 
         }
 
         self.cooldown = cooldown
@@ -52,7 +41,7 @@ class Robot(CommunicatingAgent):
         if not self.current_percepts:
             self.current_percepts = self.model.get_percepts(self)
         self.update(self.current_percepts)
-        self._process_messages()          # no-op for non-communicating strategies
+        self._process_messages()          
         action = self.deliberate(self.knowledge)
         self.current_percepts = self.model.do(self, action)
 
@@ -61,7 +50,7 @@ class Robot(CommunicatingAgent):
         self.knowledge["inventory"]          = self.wastes.copy()
         self.knowledge["grid"].update(percepts["grid"])
         self.knowledge["cooldown_remaining"] = percepts.get("cooldown_remaining", 0)
-        update_known_wastes(self.knowledge, percepts)  # always safe to call
+        update_known_wastes(self.knowledge, percepts)  
 
     def _process_messages(self):
         """No-op by default. Overridden by _RendezvousMixin."""
@@ -75,9 +64,6 @@ class Robot(CommunicatingAgent):
 # Rendezvous mixin
 # ──────────────────────────────────────────────────────────────────────────────
 
-# How many steps a rendezvous can stay alive before being force-cancelled.
-# This prevents agents from being permanently frozen if the other side
-# silently disappears (e.g. picked up a second waste from the ground).
 RENDEZVOUS_TIMEOUT = 40
 
 class _RendezvousMixin:
@@ -102,10 +88,6 @@ class _RendezvousMixin:
         inventory  = self.knowledge["inventory"]
         own_waste  = self.type
 
-        # ── Timeout guard ────────────────────────────────────────────────────
-        # Increment the step counter on every live rendezvous and cancel if it
-        # has been running too long.  This catches the case where the partner
-        # silently disappeared (e.g. picked up a second waste on its own).
         if rendezvous is not None:
             rendezvous["steps_waiting"] = rendezvous.get("steps_waiting", 0) + 1
             if rendezvous["steps_waiting"] > RENDEZVOUS_TIMEOUT:
@@ -119,10 +101,6 @@ class _RendezvousMixin:
                 self.knowledge["rendezvous"] = None
                 rendezvous = None
 
-        # ── Early-cancel for requester that lost its waste ───────────────────
-        # Only fires while we are still waiting for the first ACCEPT
-        # (target_pos is None). Once we have a confirmed partner and are
-        # navigating, we let the journey complete regardless.
         if (rendezvous is not None and
                 rendezvous["role"] == "requester" and
                 rendezvous["target_pos"] is None):
@@ -137,17 +115,12 @@ class _RendezvousMixin:
                 self.knowledge["rendezvous"] = None
                 rendezvous = None
 
-        # ── Process inbox ────────────────────────────────────────────────────
         for msg in self.get_new_messages():
             perf    = msg.get_performative()
             sender  = msg.get_exp()
             content = msg.get_content()
-            # Re-read in case an earlier message in this loop mutated it
             rendezvous = self.knowledge["rendezvous"]
 
-            # ── PROPOSE ──────────────────────────────────────────────────────
-            # Accept if: free, holding exactly 1 own waste, not self.
-            # No BFS check here — routing is comm_deliberate's responsibility.
             if perf == MessagePerformative.PROPOSE:
                 if (rendezvous is None and
                         len(inventory[own_waste]) == 1 and
@@ -156,7 +129,7 @@ class _RendezvousMixin:
                     rendezvous = {
                         "role":          "acceptor",
                         "partner":       sender,
-                        "target_pos":    content["pos"],  # requester's pos (info only)
+                        "target_pos":    content["pos"], 
                         "steps_waiting": 0,
                     }
                     self.knowledge["rendezvous"] = rendezvous
@@ -167,15 +140,10 @@ class _RendezvousMixin:
                     print(f"[{my_name}] ACCEPT → {sender} "
                           f"(my_pos={my_pos}, requester_pos={content['pos']})")
 
-            # ── ACCEPT ───────────────────────────────────────────────────────
-            # Take the first ACCEPT; reject all subsequent ones.
             elif perf == MessagePerformative.ACCEPT:
                 if (rendezvous is not None and
                         rendezvous["role"] == "requester" and
                         rendezvous["partner"] is None):
-                    # First ACCEPT — commit unconditionally.
-                    # BFS routing happens in comm_deliberate; if the path is not
-                    # known yet the agent will explore until it finds one.
                     rendezvous["partner"]    = sender
                     rendezvous["target_pos"] = content["pos"]
                     self.knowledge["rendezvous"] = rendezvous
@@ -195,13 +163,9 @@ class _RendezvousMixin:
                         MessagePerformative.CANCEL, {}
                     ))
 
-            # ── COMMIT ───────────────────────────────────────────────────────
-            # Acceptor side: requester confirmed.  Nothing extra to do — the
-            # acceptor will wait and pick up the waste when it arrives.
             elif perf == MessagePerformative.COMMIT:
                 pass
 
-            # ── CANCEL ───────────────────────────────────────────────────────
             elif perf == MessagePerformative.CANCEL:
                 if rendezvous is not None and rendezvous["partner"] == sender:
                     print(f"[{my_name}] rendezvous CANCELLED by {sender}")

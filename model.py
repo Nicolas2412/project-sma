@@ -1,14 +1,3 @@
-################################################################################
-# PROJET : SMA (Systees Multi-Agents) - Groupe 6
-# DATE DE CRÉATION : 16/03/2026
-#
-# MEMBRES DU GROUPE :
-#   - Nicolas Charronidere
-#   - Paul Guimbert
-#
-# FILE: model.py
-################################################################################
-
 import mesa
 from agents import *
 from objects import *
@@ -57,20 +46,12 @@ class RobotModel(mesa.Model):
             for j in range(self.height):
                 agent = Radioactivity(self, zone=1)
                 self.grid.place_agent(agent, (i, j))
-        
-        # for j in range(self.height):
-        #     agent = WasteDisposalZone(self, zone=1)
-        #     self.grid.place_agent(agent, (self.width_z1-1, j))
             
         for i in range(self.width_z1, self.width_z1 + self.width_z2):
             for j in range(self.height):
                 agent = Radioactivity(self, zone=2)
                 self.grid.place_agent(agent, (i, j))
         
-        # for j in range(self.height):
-        #     agent = WasteDisposalZone(self, zone=2)
-        #     self.grid.place_agent(
-        #         agent, (self.width_z1 + self.width_z2 - 1, j))
             
         for i in range(self.width_z1 + self.width_z2, self.total_width):
             if i == self.total_width-1:
@@ -84,59 +65,45 @@ class RobotModel(mesa.Model):
         
         
         green_wastes = Waste.create_agents(model=self, n=n_green_wastes, color=1)
-        # Create x and y positions for agents
         x = self.rng.integers(0, self.width_z1, size=(n_green_wastes,))
         y = self.rng.integers(0, self.grid.height, size=(n_green_wastes,))
         for a, i, j in zip(green_wastes, x, y):
-            # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
         yellow_wastes = Waste.create_agents(
             model=self, n=n_yellow_wastes, color=2)
-        # Create x and y positions for agents
         x = self.rng.integers(
             self.width_z1, self.width_z1 + self.width_z2, size=(n_yellow_wastes,))
         y = self.rng.integers(0, self.grid.height, size=(n_yellow_wastes,))
         for a, i, j in zip(yellow_wastes, x, y):
-            # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
 
         red_wastes = Waste.create_agents(
             model=self, n=n_red_wastes, color=3)
-        # Create x and y positions for agents
         x = self.rng.integers(self.width_z1 + self.width_z2,self.width_z1 + self.width_z2 + self.width_z3, size=(n_red_wastes,))
         y = self.rng.integers(0, self.grid.height, size=(n_red_wastes,))
         for a, i, j in zip(red_wastes, x, y):
-            # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
         green_agents = GreenAgent.create_agents(model=self, n=n_green_agents, strategy=self.strategy)
-        # Create x and y positions for agents
         x = self.rng.integers(0, self.width_z1, size=(n_green_agents,))
         y = self.rng.integers(0, self.grid.height, size=(n_green_agents,))
         for a, i, j in zip(green_agents, x, y):
-            # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
         yellow_agents = YellowAgent.create_agents(model=self, n=n_yellow_agents, strategy=self.strategy)
-        # Create x and y positions for agents
         x = self.rng.integers(self.width_z1, self.width_z1 + self.width_z2, size=(n_yellow_agents,))
         y = self.rng.integers(0, self.grid.height, size=(n_yellow_agents,))
         for a, i, j in zip(yellow_agents, x, y):
-            # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
         red_agents = RedAgent.create_agents(model=self, n=n_red_agents, strategy=self.strategy)
-        # Create x and y positions for agents
         x = self.rng.integers(self.width_z1 + self.width_z2, self.width_z1 +
                             self.width_z2 + self.width_z3, size=(n_red_agents,))
         y = self.rng.integers(0, self.grid.height, size=(n_red_agents,))
         for a, i, j in zip(red_agents, x, y):
-            # Add the agent to a random grid cell
             self.grid.place_agent(a, (i, j))
             
-            
-        # Initialization of the data collector
         self.datacollector = mesa.DataCollector(
             model_reporters={
                 "Green Waste": lambda m: sum(1 for a in m.agents if isinstance(a, Waste) and a.color == 1),
@@ -144,8 +111,7 @@ class RobotModel(mesa.Model):
                 "Red Waste": lambda m: sum(1 for a in m.agents if isinstance(a, Waste) and a.color == 3),
             }
         )
-        
-        # Initialize grid cach, used to improve computation 
+
         self._grid_cache = {}
         for _, pos in self.grid.coord_iter():
             self._update_cache_at(pos)
@@ -202,11 +168,9 @@ class RobotModel(mesa.Model):
 
         elif action_type == "transform":
             if len(agent.wastes[agent.type]) == 2:
-                # Supprimer les 2 déchets portés
                 for waste in agent.wastes[agent.type]:
                     waste.remove()
                 agent.wastes[agent.type] = []
-                # Créer le nouveau déchet de niveau supérieur
                 new_waste = Waste(self, color=agent.type + 1)
                 agent.wastes[agent.type + 1].append(new_waste)
                 
